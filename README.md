@@ -42,6 +42,65 @@ The skill triggers automatically on phrases like that, or invoke it explicitly. 
 the full workflow, scoring methodology, and the specific investigation techniques it applies per
 dimension.
 
+## What a good `docs/` folder looks like
+
+The skill works with whatever docs you have — including none — but the more of the following you
+have, the sharper and more useful its findings get. This list is drawn directly from what actually
+made a difference across testing, not a generic "write good docs" checklist.
+
+**A recommended file set** (one per repo, or one per deployable if it's a monorepo with several):
+
+- `architecture.md` — module/component topology, data flow, entry points.
+- `boundaries.md` — every REST endpoint, queue/topic, cron job, external API and datastore this
+  component touches. This is the single highest-value doc for the reconciliation pass.
+- `data-model.md` — entities, keys, invariants. Point it at the real schema/DDL, not just at ORM
+  classes — the skill checks both and the two disagreeing is one of its most common findings.
+- `conventions.md` — naming, layering, testing, and error-handling conventions actually in force.
+  Concrete stated conventions ("every repository extends X") are directly checkable; "we try to
+  keep things consistent" is not.
+- `glossary.md` — domain terms and acronyms. Low effort, and it sharpens every other doc's claims.
+- `technical-vision.md` — **why** the system is shaped the way it is: key architectural decisions,
+  trade-offs accepted, and what's coming next. This is the single most commonly *missing* piece —
+  across every real test run, an empty or template-only vision doc was found and flagged. If you
+  only add one thing from this list, add real content here, not scaffolding.
+- `patterns/add-<thing>.md` — short "how to add a new consumer / endpoint / calculator" guides.
+  These give the extensibility dimension a concrete, checkable baseline: the skill counts how many
+  actual instances of "X" in your code follow the documented pattern vs. duplicate logic inline.
+
+**Claims should be concrete and falsifiable.** "Service A must not call Service B directly," "all
+payment writes go through the ledger service," "`OrderConsumer` failures are dropped, not
+dead-lettered" — these can be checked against code and produce a real finding either way. "The
+service is scalable" or "we follow best practices" cannot be checked against anything and are
+silently skipped.
+
+**Be careful with "complete list" claims.** A table that enumerates "every Kafka consumer" or
+"every REST endpoint" is extremely useful when accurate — but it's also the single most common
+source of a *gap* finding, because it silently becomes wrong the moment one more consumer or
+endpoint is added without a matching doc update. This isn't a reason to avoid such tables (they're
+worth having), just an expectation to set: if you have one, expect the skill to occasionally catch
+it lagging behind, and that's the point.
+
+**Name what's coming next, not just what exists today.** A short "known gaps / forward direction"
+section — a new tenant or business model you're about to onboard, a migration in progress, a
+planned schema change — lets the evaluation pass check whether your current architecture is
+actually ready for it, instead of only judging against today's usage. Some of the most valuable
+findings in testing came from checking a schema against a stated future requirement, not its
+current one.
+
+**If you keep diagrams, prefer a text format (Mermaid) as the source of truth**, and if you also
+keep a frozen image export (PNG/SVG) alongside it, say explicitly which one wins if they disagree.
+The skill treats this as an explicit reconciliation target — a frozen export that's drifted from
+its own source diagram is a real, common, and easy-to-fix finding.
+
+**Add frontmatter metadata if you can** — a `last-generated:` date and the source file globs a doc
+was written from. It's a strong freshness signal, but keep it honest: a doc that cites a source
+path that no longer exists (because a module was extracted, deleted, or moved) is exactly the kind
+of drift this skill is built to catch, and citing a real path is what makes that catchable at all.
+
+**In a monorepo, scope docs per deployable.** If the repo has more than one independently-deployed
+component, give each its own `docs/` tree rather than one shared root folder — each one drifts on
+its own schedule, and the skill discovers and reconciles all of them separately by default.
+
 ## Validation
 
 ### Methodology
