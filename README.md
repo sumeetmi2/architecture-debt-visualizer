@@ -8,24 +8,38 @@ whether the docs state the scale and extensibility *targets* the architecture is
 judged against in the first place — a hardcoded worker count is a very different finding at 50 QPS
 than at 5,000 QPS, and most repos never write down which one applies.
 
-Produces a self-contained, scored HTML report: a static-analysis panel (dependency coupling, git
-churn, contributor/bus-factor signals), a curated shortlist of the most pressing findings, and a
-full findings table filterable by classification and evaluation dimension.
+Produces a self-contained HTML report with four headline indicators — Documentation fidelity,
+Architecture risk, Audit coverage, Evidence confidence — plus a static-analysis panel (dependency
+coupling, git churn, contributor/bus-factor signals), a curated shortlist of the most pressing
+findings, and a full findings table filterable by classification and evaluation dimension.
 
 ## What it does
 
 1. **Reconciliation** — extracts checkable claims from your docs (`docs/*.md`, Mermaid diagrams,
    READMEs) and verifies each against the real code: confirmed, misaligned, or a gap.
-2. **Evaluation** — independent of any doc claim, judges the architecture on its own merits across
-   9 dimensions using a fixed rubric (not open-ended "look around"), so results are reproducible
-   run to run: scale-requirements, extensibility-requirements, scalability, extensibility,
-   maintainability, performance/cost, data-architecture, observability, vision-alignment. The two
-   "requirements" dimensions run first and feed the rest — they check whether the docs ever state a
-   target throughput/latency/growth figure or a named future extensibility need, and if one exists,
-   later scalability/extensibility findings cite it directly instead of judging against an implicit
-   standard. If no target is documented anywhere, that absence is itself a finding.
-3. **Score** — a heuristic, debt-weighted 0-100 score with a per-dimension penalty cap, meant for
-   tracking one repo's trend over time, not for ranking systems against each other.
+2. **System classification** — before judging the architecture, classifies what kind of repo this
+   actually is (`production-service` / `library` / `cli-tool` / `batch-job` / `prototype` /
+   `archived`), evidence-first, defaulting to the strictest tier (`production-service`) whenever
+   it's genuinely unclear. A missing QPS target isn't the same finding on a CLI tool as it is on a
+   payments service — this is what keeps the evaluation pass from judging every repo as if it were
+   the production system this skill was originally built and tested against.
+3. **Evaluation** — independent of any doc claim, judges the architecture on its own merits across
+   9 dimensions: scale-requirements, extensibility-requirements, scalability, extensibility,
+   maintainability, performance/cost, data-architecture, observability, vision-alignment. Every
+   mandatory check (mandatory per the system classification above) gets exactly one coverage
+   record — `risk`, `strength`, `clean`, `not-applicable`, or `not-assessed` — so *what gets
+   checked* is fixed and reproducible, without forcing a minimum or maximum number of findings the
+   way an earlier version of this rubric did.
+4. **Report** — Documentation fidelity and Architecture risk separate "are the docs accurate" from
+   "is the architecture good," so improving one doesn't silently move the other; Audit coverage
+   says how much of the mandatory checklist actually ran; Evidence confidence says how much of
+   what's reported rests on direct citation vs. inference. A legacy 0-100 debt index (the original
+   single-number score) is kept as a fifth, secondary figure for continuity with earlier reports.
+
+Optionally run in a narrower **mode** — `reconcile` (docs-accuracy only), `evaluate`
+(architecture-judgment only), or `full` (both, and the default whenever intent is ambiguous) — so a
+narrow request like "is `boundaries.md` stale?" doesn't pay for a full evaluation pass it didn't ask
+for.
 
 Currently ships one deterministic script for dependency-graph extraction that's Java/Gradle-specific
 (`extract_dep_graph.py` parses `package`/`import` syntax); the report generator and churn analysis
@@ -152,7 +166,7 @@ Terms used below:
   abstract.
 - **Finding** — one row in the report: a reconciliation result (confirmed / misaligned / gap,
   checked against a real doc claim) or an evaluation result (risk / strength, judged independent of
-  any doc claim) in one of the 7 evaluation dimensions.
+  any doc claim) in one of the 9 evaluation dimensions.
 - **Per-dimension checklist coverage** — the evaluation pass defines a fixed set of mandatory,
   individually-named sub-checks per dimension (7 for data-architecture, e.g. identity/PK
   consistency, naming-convention drift, referential integrity, partition maintenance, type choices,
@@ -177,6 +191,57 @@ Separately, every high-severity finding produced by a deep, human-guided referen
 same repo was independently rediscovered by cold agents that never saw that reference pass or its
 findings — including cases where two agents, given the identical prompt and scope, arrived at the
 same conclusion via different evidence.
+
+### Evolving further: check-coverage model + system classification
+
+The fixed min/max finding-count rubric above fixed the *count* variance, but an external review
+pointed out it mixed up two different things: checks performed and problems found, and it created
+a real incentive to manufacture a weak finding just to hit a floor. It was replaced with a
+check-coverage model — every mandatory lettered check gets exactly one coverage record
+(`risk`/`strength`/`clean`/`not-applicable`/`not-assessed`), with no minimum or maximum finding
+count anywhere — plus system classification, so a missing scale target isn't penalized the same
+way on a CLI tool as on a production service (see "What it does" above).
+
+Three fresh cold runs validated this end to end:
+
+| Run | system_type | Findings | Audit coverage |
+|---|---|---|---|
+| [sample-service/docs-bad](examples/sample-service/reports/docs-bad-run4-v2skill.html) | production-service | 20 | 100% (22/22) |
+| [sample-service/docs-good](examples/sample-service/reports/docs-good-run2-v2skill.html) | production-service | 23 | 100% (22/22) |
+| [minimal-cli-tool](examples/minimal-cli-tool/report-v2skill.html) | cli-tool | 9 | 100% (16/16) |
+
+The `minimal-cli-tool` run is the golden case for system classification: it classified `cli-tool`
+from real evidence (a `main()` entry point, no server/listener/consumer anywhere, an
+`application`-plugin Gradle config) and correctly resolved the missing scale-requirements and
+observability checks `not-applicable` rather than flagging them as `risk` — see
+[`examples/minimal-cli-tool.expected.md`](examples/minimal-cli-tool.expected.md) for the full
+golden spec.
+
+These same three runs also surfaced a real defect in the new model itself: one run shared a single
+`finding_id` across two checks it judged were "answered by the same paragraph," producing 13
+findings, while an independent identical-scope run wrote a distinct finding per check and produced
+22 — both technically satisfied full coverage, but the count still swung ~2x, undercutting the
+whole point of replacing a count-based rubric with a coverage-based one. Fixed with an explicit
+rule (shared evidence is fine, a shared `finding_id` is not) now enforced by `validate_findings.py`
+below, not just documented in prose.
+
+**`skills/architecture-debt-visualizer/scripts/validate_findings.py`** turns the skill's evidence
+rules into an enforced gate instead of prose the agent might skip under time pressure: duplicate
+finding/check IDs, invalid enum values, empty required fields, medium/high risk findings missing a
+recommendation, evidence files that don't exist on disk, negative-search findings missing
+`searches_performed`, missing mandatory coverage records, and the shared-`finding_id` rule above
+all hard-fail with a specific message. A likely-bare-hypothesis phrasing check (the recurring
+regression noted below) is a non-blocking warning — that one needs semantic judgment a keyword
+heuristic can't fully make.
+
+**`skills/architecture-debt-visualizer/evals/`** is a golden-test harness — `cases.json` (JSON, not
+YAML: every script here is deliberately zero-third-party-dependency, and PyYAML isn't guaranteed
+installed) defines `must_find`/`must_not_find`/`expected_not_applicable` specs, and `run_evals.py`
+grades an already-generated `findings.json`/`checks.json` against them. It doesn't invoke the skill
+itself — it's a scoring pass over output a real run already produced. Both seed cases (all 9
+`docs-bad` planted issues; the `minimal-cli-tool` false-positive suppression) pass against the runs
+in the table above, and the suppression case correctly *fails* when pointed at the `docs-bad` run
+instead, confirming it actually discriminates.
 
 ### Public, reproducible test: `examples/sample-service`
 
@@ -211,12 +276,23 @@ directly. It also caught a real, unplanted mistake in the "good" docs themselves
 [`examples/sample-service/README.md`](examples/sample-service/README.md#docs-good-run) for details.
 
 **Known limitation, disclosed rather than hidden:** a phrasing rule exists (state findings as direct
-facts, not as an unresolved positive-sounding hypothesis with no marker — see `SKILL.md`) specifically
-because early testing showed the wrong phrasing reads as a false "this is fine" on a skim. It's
-followed reliably when a run is explicitly told to self-audit before finalizing, but recurs in some
-ordinary cold runs (visible in a few rows across the reports linked above) because the instruction
-currently isn't self-enforcing. Content and evidence are unaffected — only the wording of some claim
-sentences reads more ambiguously than intended. Tracked as follow-up work, not swept under the rug.
+facts, not as an unresolved positive-sounding hypothesis with no marker — see
+`references/evidence-standard.md`) specifically because early testing showed the wrong phrasing
+reads as a false "this is fine" on a skim. It's followed reliably when a run is explicitly told to
+self-audit before finalizing, but recurs in some ordinary cold runs (visible in a few rows across
+the reports linked above) because the instruction currently isn't self-enforcing on its own.
+`validate_findings.py` now flags likely violations as a warning — a partial mitigation (a human or
+agent still has to act on the warning), not a fix, since reliably detecting a bare hypothesis is a
+semantic judgment a keyword heuristic can't fully make. Content and evidence are unaffected — only
+the wording of some claim sentences reads more ambiguously than intended. Tracked as follow-up
+work, not swept under the rug.
+
+**Report schema versions:** the `docs-bad-run1/2/3` and `docs-good-run1` reports linked earlier in
+this section predate the check-coverage model and use the original single 0-100-score format —
+`generate_report.py` still renders them correctly, but the four headline indicators show `—` since
+those runs have no `checks.json`/`context.json`/confidence fields to compute them from. The
+`*-v2skill` reports above are the first generated after the schema change. Neither set was
+regenerated to match the other — a schema change shouldn't quietly rewrite history.
 
 ## License
 

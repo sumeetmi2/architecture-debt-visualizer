@@ -63,3 +63,14 @@ prefix. That's not a planted issue; it was a mistake introduced while writing th
 same way it would catch one in a real repo. The doc has since been corrected (see git history) — the
 linked report reflects the state at the time it was generated, kept as-is rather than scrubbed, the
 same way the `docs-bad` runs above kept unplanted findings intact.
+
+## `*-v2skill` runs (check-coverage model + system classification)
+
+[`reports/docs-bad-run4-v2skill.html`](reports/docs-bad-run4-v2skill.html) and
+[`reports/docs-good-run2-v2skill.html`](reports/docs-good-run2-v2skill.html) are the first runs
+generated after the skill's check-coverage/system-classification rewrite (see the top-level
+`README.md`'s "Evolving further" section) — same fixture, new report schema (four headline
+indicators plus `checks.json`/`context.json` alongside each `.html`). Both classified
+`production-service` with 100% audit coverage (22/22 mandatory checks, 0 not-assessed). Use these,
+not the schema-version note above, if you want to see what a current run actually looks like;
+`docs-bad-run1-3`/`docs-good-run1` are kept as the original reliability-methodology record.
