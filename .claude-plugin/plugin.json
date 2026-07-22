@@ -1,0 +1,9 @@
+{
+  "name": "architecture-debt-visualizer",
+  "description": "Reconciles a repo's design docs against its actual code and evaluates the architecture itself like a senior/staff architect — scalability, extensibility, maintainability, performance/cost, data-architecture, observability, and vision alignment. Produces a scored, filterable HTML report.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sumeet Sharma"
+  },
+  "license": "MIT"
+}

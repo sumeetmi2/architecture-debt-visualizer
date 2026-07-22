@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "architecture-debt-visualizer",
+  "description": "Docs-vs-code reconciliation and independent architectural evaluation for any repo.",
+  "owner": {
+    "name": "Sumeet Sharma"
+  },
+  "plugins": [
+    {
+      "name": "architecture-debt-visualizer",
+      "description": "Reconciles design docs against code and evaluates the architecture across 7 dimensions (scalability, extensibility, maintainability, performance/cost, data-architecture, observability, vision-alignment). Produces a scored, filterable HTML report.",
+      "category": "code-review",
+      "source": "./"
+    }
+  ]
+}
