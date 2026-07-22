@@ -24,6 +24,11 @@ See `system-classification.md` for the full field meanings and the classificatio
 }
 ```
 
+`system_type: "unknown"` is a legitimate, honest value when the evidence genuinely doesn't support
+any other classification — pair it with `applicability_profile: "production-strict"` (optional
+field; defaults to strict if omitted) rather than guessing a specific type just to get strict rules
+applied. See `system-classification.md` for why this is kept as two separate questions.
+
 ## `checks.json` (evaluate/full modes only)
 
 One entry per mandatory (and optionally, non-mandatory) check from `scripts/rubric_manifest.json`.
@@ -32,12 +37,20 @@ One entry per mandatory (and optionally, non-mandatory) check from `scripts/rubr
 {
   "checks": [
     {
+      "id": "scalability.a",
+      "dimension": "scalability",
+      "status": "risk",
+      "scope": ["application.properties"],
+      "confidence": "high",
+      "finding_ids": ["f8", "f9", "f10"]
+    },
+    {
       "id": "observability.a",
       "dimension": "observability",
       "status": "risk",
       "scope": ["OrderEventConsumer"],
       "confidence": "high",
-      "finding_id": "f17"
+      "finding_ids": ["f17"]
     },
     {
       "id": "observability.b",
@@ -60,6 +73,18 @@ One entry per mandatory (and optionally, non-mandatory) check from `scripts/rubr
 
 - `id` — must match an id in `scripts/rubric_manifest.json`.
 - `status` — `risk` / `strength` / `clean` / `not-applicable` / `not-assessed`.
+- `finding_ids` — required, non-empty array, when `status` is `risk` or `strength`. **One check can
+  produce multiple findings when it genuinely surfaces multiple independent issues** — e.g.
+  `scalability.a` asks you to list every hardcoded capacity number, not stop at the first one; if
+  you find three independent ones (a consumer concurrency limit, a reconciliation-window horizon, a
+  batch size), that's three findings, all listed in this one check's `finding_ids`, not one
+  oversized finding combining them or two of them silently dropped to keep the check-to-finding
+  ratio at 1:1. The constraint runs the other direction: **every finding belongs to exactly one
+  check** — the same finding id must never appear in more than one check's `finding_ids` array
+  (that's still the original anti-pattern this schema exists to prevent: don't let two *different*
+  checks share credit for one finding just because they happened to draw on the same evidence).
+  (Legacy singular `finding_id: "f17"` from before this array form still parses as a one-element
+  list — not required going forward, but not invalidated either.)
 - `scope` — free-text array naming what the check was actually run against: a class/file name for
   a code-scoped check (`"OrderEventConsumer"`), a doc path for a doc-scoped check
   (`"docs/technical-vision.md"`), or a component/deployment-unit label when neither applies

@@ -27,12 +27,22 @@ Write `context.json` in the run directory:
 ```
 
 - `system_type` — one of `production-service`, `library`, `cli-tool`, `batch-job`, `prototype`,
-  `archived`. Pick evidence-first: a server/listener/consumer entry point and a deployment
-  manifest → `production-service`; a packaged/published artifact with a public API surface and no
-  server → `library`; an entry point with a `main`/`bin` and no long-running process → `cli-tool`;
-  a scheduled job with no HTTP surface → `batch-job`; explicit `WIP`/`experimental`/`spike`
-  language in the README or a very recent, thin commit history → `prototype`; a repo whose README
-  or last commits say it's deprecated/frozen/superseded → `archived`.
+  `archived`, `unknown` (see below). Pick evidence-first: a server/listener/consumer entry point
+  and a deployment manifest → `production-service`; a packaged/published artifact with a public API
+  surface and no server → `library`; an entry point with a `main`/`bin` and no long-running process
+  → `cli-tool`; a scheduled job with no HTTP surface → `batch-job`; a repo whose README or last
+  commits say it's deprecated/frozen/superseded → `archived`.
+
+  **`prototype` needs *positive* evidence, not just the absence of maturity signals.** A genuinely
+  new production service can also have a thin, recent commit history — that alone doesn't make it
+  a prototype, and treating it as one would wrongly suppress mandatory checks on a system that's
+  about to go live. Classify `prototype` only on affirmative evidence: explicit
+  `WIP`/`experimental`/`spike`/`POC`/`not for production` language in the README or docs, no
+  deployment path anywhere (no manifest, no CI deploy step), mock/fixture-only integrations, missing
+  persistence or operational config where the architecture would need one, or a roadmap doc that
+  explicitly frames the work as validation/exploration. Thin history alone should lower your
+  `confidence`, or prompt you to look for one of the above before deciding — it should never by
+  itself be the deciding signal.
 
   **Illustrative/non-buildable teaching fixtures still classify by architectural shape, not by
   disclaimer.** A repo whose build config says "illustrative only, not buildable, nothing to
@@ -54,14 +64,37 @@ Write `context.json` in the run directory:
   literally `"unknown"` — never a guessed figure.
 - `confidence` — `high`/`medium`/`low`, your own confidence in `system_type`.
 
-## Default on low confidence: `production-service`
+## Genuinely can't tell: `system_type: "unknown"`, strict rules still apply
 
-**If `confidence` is `low`, or you genuinely can't tell, classify as `production-service` anyway
-and say so in `classification_evidence`.** This is a deliberate strictness default, not laziness:
-this skill's whole track record was built and validated against a real production fintech system,
-and defaulting an uncertain repo to a *lenient* tier would silently weaken scrutiny for the common
-case this skill actually exists to serve. Leniency is earned by positive evidence of a smaller
-blast radius (a library, a CLI tool, a prototype), never assumed by default.
+**If you genuinely can't tell what this repo is, say so honestly — set `system_type: "unknown"`,
+not `"production-service"`.** An earlier version of this rule said to classify uncertain repos as
+`production-service` outright. That conflated two different things: *what the repo is* (a factual
+question `context.json` should answer honestly) and *how strictly to apply the rubric* (a policy
+question, separate from the fact). Calling something a production service when you don't actually
+have that evidence makes `context.json` misleading, even in service of a reasonable goal.
+
+The strictness still applies — it just applies as policy, not as a fabricated fact:
+
+```json
+{
+  "system_type": "unknown",
+  "applicability_profile": "production-strict",
+  "confidence": "low",
+  "classification_evidence": [
+    "No server/listener, no packaged-library manifest, no CLI entry point found — couldn't
+     positively identify a shape; applying the strict production-service check set as policy
+     rather than guessing a type the evidence doesn't support"
+  ]
+}
+```
+
+`applicability_profile` is what `scripts/rubric_manifest.json`'s `system_type_overrides` actually
+keys off downstream, and it defaults to `"production-strict"` (all checks mandatory — the same
+behavior `system_type_overrides` already gives any key it doesn't recognize, including
+`"unknown"`, so this needs no lookup-table change). Set it to a specific `system_type`'s profile
+(e.g. `"library"`) only when you have real evidence for that leniency — leniency is earned by a
+positive finding of a smaller blast radius, never assumed by default or granted just because the
+type is uncertain.
 
 ## How applicability changes downstream
 

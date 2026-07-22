@@ -153,10 +153,9 @@ the other caught it. Coverage records fix this directly: `data-architecture.b` (
 normalization) and `data-architecture.e` (type choices) are different check IDs and both need their
 own record, regardless of how many risks either one turns up.
 
-**Every check that resolves `risk` or `strength` gets its own `findings.json` entry — never share
-one `finding_id` across two checks, even when the same evidence or the same doc paragraph feeds
-both.** A measured failure mode from the *new* check-coverage model's first validation run: one run
-noticed `scale-requirements.a` and `scale-requirements.b` were both answered by the same vision-doc
+**A finding belongs to exactly one check; a check can produce more than one finding.** A measured
+failure mode from the check-coverage model's first validation run: one run noticed
+`scale-requirements.a` and `scale-requirements.b` were both answered by the same vision-doc
 paragraph, and wrote one combined finding referenced by both checks' coverage records — 13
 findings, fully covered on paper. A second, independent run wrote a separate finding per check —
 22 findings, also fully covered on paper. Both technically satisfied "every mandatory check has a
@@ -164,9 +163,21 @@ coverage record," but the finding *count* swung by nearly 2x anyway, which defea
 of replacing the old min/max-count rubric with a coverage model in the first place: coverage was
 supposed to make finding count an *output*, not something still subject to a judgment call. The
 fix: shared evidence is fine and expected (the same file/line can support multiple findings); a
-shared `finding_id` is not. If two checks are answered by the same underlying fact, write two
-findings that both cite it, each with its own id, each linked from its own check record — never
-merge them into one.
+finding credited to more than one check is not. If two checks are answered by the same underlying
+fact, write two findings that both cite it, each with its own id, each linked only from its own
+check's `finding_ids` — never merge them into one, and never let one finding sit in two checks'
+`finding_ids` arrays.
+
+**That fix doesn't mean force every check down to exactly one finding either — a check's
+`finding_ids` is an array for a reason.** Several lettered checks explicitly ask you to enumerate
+everything, not stop at the first hit — `scalability.a` says "don't stop after finding one; list
+them." If a check turns up several genuinely independent issues (three separate hardcoded capacity
+numbers with different evidence, different consequences, different fixes), write one finding per
+issue and list all of them in that check's `finding_ids`. Cramming three independent risks into one
+oversized finding just to keep a tidy 1:1 shape hides two of them from anyone scanning the findings
+table by severity/dimension, and picking only the "best" one to report silently drops real, already-
+discovered risk. The one-owner rule above is about *credit* (a finding isn't shared property of two
+checks); it was never meant to cap a check at one finding.
 
 ## Dimension checklists
 

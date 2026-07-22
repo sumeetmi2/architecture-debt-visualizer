@@ -169,24 +169,31 @@ def main():
             if status not in CHECK_STATUSES:
                 errors.append(f"{where}: status '{status}' not in {sorted(CHECK_STATUSES)}")
 
-            fid = c.get("finding_id")
+            # finding_ids (array) is current; legacy singular finding_id still accepted as a
+            # one-element list so pre-array checks.json files don't retroactively fail validation.
+            fids = c.get("finding_ids")
+            if fids is None and c.get("finding_id"):
+                fids = [c["finding_id"]]
+            fids = fids or []
+
             if status in ("risk", "strength"):
-                if not fid:
-                    errors.append(f"{where}: status '{status}' requires a 'finding_id'")
-                elif fid not in seen_finding_ids:
-                    errors.append(f"{where}: finding_id '{fid}' does not exist in findings.json")
+                if not fids:
+                    errors.append(f"{where}: status '{status}' requires a non-empty 'finding_ids'")
+                for fid in fids:
+                    if fid not in seen_finding_ids:
+                        errors.append(f"{where}: finding_ids references '{fid}', which does not exist in findings.json")
             if status == "clean" and not (c.get("evidence") or []):
                 errors.append(f"{where}: status 'clean' requires an 'evidence' entry")
             if status in ("not-applicable", "not-assessed") and not s(c, "reason").strip():
                 errors.append(f"{where}: status '{status}' requires a non-empty 'reason'")
 
-            if fid:
+            for fid in fids:
                 if fid in finding_id_owners:
                     errors.append(
-                        f"{where}: finding_id '{fid}' is already referenced by check "
-                        f"'{finding_id_owners[fid]}' — every check needs its own finding, "
-                        f"sharing one across checks defeats the coverage model "
-                        f"(see evaluation-rubric.md's shared-evidence-vs-shared-finding_id rule)"
+                        f"{where}: finding id '{fid}' is already owned by check "
+                        f"'{finding_id_owners[fid]}' — a finding belongs to exactly one check "
+                        f"(see evaluation-rubric.md's finding-ownership rule); a check CAN list "
+                        f"multiple finding_ids of its own, it just can't share one with another check"
                     )
                 else:
                     finding_id_owners[fid] = cid

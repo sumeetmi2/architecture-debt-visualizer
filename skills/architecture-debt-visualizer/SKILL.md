@@ -42,8 +42,9 @@ all of them.
 ## 0. Resolve mode
 
 - **`reconcile`** — docs-accuracy questions ("is `boundaries.md` stale?", "did this diagram
-  drift?", "audit our docs against code"). Runs steps 1, 2, 4, 6-9. Skips system context and the
-  evaluation pass entirely.
+  drift?", "audit our docs against code"). Runs steps 1, 2, 4, 6-9, and step 3 only if it'll
+  actually help (see step 3's own note — it's optional, not mandatory, in this mode). Skips system
+  context and the evaluation pass entirely.
 - **`evaluate`** — architecture-judgment questions ("is this scalable?", "review our data model",
   "what architecture debt exists here?"). Runs steps 1.5, 3, 5, 6-9. Skips reconciliation.
 - **`full`** — explicit "architecture audit" / "architecture debt report" requests, **and the
@@ -74,7 +75,13 @@ See `references/reconciliation.md`. Pull concrete, falsifiable claims from each 
 component relationships, boundary rules, behavioral guarantees — skipping subjective or
 already-flagged-uncertain statements.
 
-## 3. Build the deterministic signals (all modes)
+## 3. Build the deterministic signals (`evaluate`/`full` mandatory; optional in `reconcile`)
+
+The evaluation pass (step 5) always needs this — churn/dep-graph directly drive several lettered
+checks (maintainability's bus-factor check, prioritizing which packages get close reading). A
+`reconcile`-only run doesn't strictly need it: run it anyway if the churn signal would help
+prioritize which claims to verify first, skip it for a narrow, already-well-scoped question ("is
+this one table stale?") where it wouldn't change what you do next.
 
 **First, make a unique run directory — never reuse a fixed literal path.** Two runs (a re-run, a
 parallel/nested agent) sharing a hardcoded path will silently clobber each other's files — this
