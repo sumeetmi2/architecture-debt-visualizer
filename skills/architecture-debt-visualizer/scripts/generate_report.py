@@ -15,7 +15,8 @@ Inputs (all JSON):
           "classification": "confirmed" | "misaligned" | "gap" | "risk" | "strength",
           "dimension": "correctness" | "scale-requirements" | "extensibility-requirements" |
                        "scalability" | "extensibility" | "maintainability" | "performance-cost" |
-                       "data-architecture" | "observability" | "vision-alignment",
+                       "data-architecture" | "observability" | "reliability-resilience" |
+                       "change-safety" | "security-boundaries" | "vision-alignment",
           "severity": "info" | "low" | "medium" | "high",
           "packages": ["com.example.app.consumer"],
           "evidence": [{"file": "path", "line": 42, "note": "why this supports/contradicts the claim"}],
@@ -78,6 +79,9 @@ DIMENSION_LABEL = {
     "performance-cost": "Performance / Cost",
     "data-architecture": "Data Architecture",
     "observability": "Observability",
+    "reliability-resilience": "Reliability / Resilience",
+    "change-safety": "Change Safety",
+    "security-boundaries": "Security Boundaries",
     "vision-alignment": "Vision Alignment",
 }
 SEVERITY_LABEL = {"info": "Info", "low": "Low", "medium": "Medium", "high": "High"}
@@ -591,6 +595,9 @@ TEMPLATE = """<!doctype html>
   <button data-filter-group="dim" data-filter="performance-cost">Performance / Cost</button>
   <button data-filter-group="dim" data-filter="data-architecture">Data Architecture</button>
   <button data-filter-group="dim" data-filter="observability">Observability</button>
+  <button data-filter-group="dim" data-filter="reliability-resilience">Reliability / Resilience</button>
+  <button data-filter-group="dim" data-filter="change-safety">Change Safety</button>
+  <button data-filter-group="dim" data-filter="security-boundaries">Security Boundaries</button>
   <button data-filter-group="dim" data-filter="vision-alignment">Vision Alignment</button>
 </div>
 <main>

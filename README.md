@@ -24,9 +24,10 @@ findings, and a full findings table filterable by classification and evaluation 
    payments service — this is what keeps the evaluation pass from judging every repo as if it were
    the production system this skill was originally built and tested against.
 3. **Evaluation** — independent of any doc claim, judges the architecture on its own merits across
-   9 dimensions: scale-requirements, extensibility-requirements, scalability, extensibility,
-   maintainability, performance/cost, data-architecture, observability, vision-alignment. Every
-   mandatory check (mandatory per the system classification above) gets exactly one coverage
+   12 dimensions: scale-requirements, extensibility-requirements, scalability, extensibility,
+   maintainability, performance/cost, data-architecture, observability, reliability/resilience,
+   change safety, security boundaries, vision-alignment. Every mandatory check (mandatory per the
+   system classification above) gets exactly one coverage
    record — `risk`, `strength`, `clean`, `not-applicable`, or `not-assessed` — so *what gets
    checked* is fixed and reproducible, without forcing a minimum or maximum number of findings the
    way an earlier version of this rubric did.

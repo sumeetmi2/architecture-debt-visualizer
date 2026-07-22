@@ -24,7 +24,8 @@ CLASSIFICATIONS = {"confirmed", "misaligned", "gap", "risk", "strength"}
 DIMENSIONS = {
     "correctness", "scale-requirements", "extensibility-requirements", "scalability",
     "extensibility", "maintainability", "performance-cost", "data-architecture",
-    "observability", "vision-alignment",
+    "observability", "reliability-resilience", "change-safety", "security-boundaries",
+    "vision-alignment",
 }
 SEVERITIES = {"info", "low", "medium", "high"}
 CHECK_STATUSES = {"risk", "strength", "clean", "not-applicable", "not-assessed"}

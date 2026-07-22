@@ -55,9 +55,9 @@ every significant component/pattern/decision you encounter, ask:
 - **Performance / operational cost** — expensive external calls (data-warehouse queries, third-
   party APIs) with no visible cost guardrail, missing caching/indexing where access patterns
   clearly demand it, and governance gaps (tests/lint/coverage tooling that exists but isn't
-  enforced anywhere). For a `batch-job` system type, also weigh idempotency and restartability here
-  — can a failed run safely re-run without double-processing, and is there a documented recovery
-  path?
+  enforced anywhere). Idempotency/restartability (can a failed run safely re-run without double-
+  processing?) lives under **Reliability / resilience** below, not here — don't duplicate that
+  check in this dimension.
 - **Observability / golden signals** — its own deliberate pass, not a footnote under performance.
   For every critical logic path (the ones on the money/data-integrity critical path, the highest-
   churn packages, anything a "drop and recover later" pattern depends on), check for the four
@@ -82,6 +82,28 @@ every significant component/pattern/decision you encounter, ask:
 - **Data architecture / entity design** — this needs its own deliberate pass, not a byproduct of
   reading prose. Go read the actual DDL/schema (not just a doc's description of it) and the ORM
   mapping code — see the lettered checklist below for the specific things to check.
+- **Reliability / resilience** — a codebase that's scalable and well-observed can still fail badly.
+  For write/mutation paths: is retry paired with idempotency, or does a retry double-process? For
+  dependencies (DB, external API, broker): does a failure cascade, or is there a timeout/circuit-
+  breaker/bulkhead? For consumers: what actually happens to a message that can never be processed —
+  trace the real failure-strategy config, don't assume a DLQ exists because the concept is
+  mentioned somewhere. For multi-step operations, what's the behavior when step 2 fails after step
+  1 already committed — an outbox/compensating pattern, or an undocumented inconsistency window?
+- **Change safety** — a system can be well-architected at rest and still be dangerous to evolve.
+  Are breaking API/schema changes versioned with a real deprecation path, or silent? Do DB
+  migrations expand-then-contract, or drop/rename columns live? Do message consumers tolerate
+  unknown new fields (forward compatibility), or would a producer adding a field break them? If a
+  recent deploy needed rolling back, would the accompanying change actually roll back cleanly, or
+  is it a one-way door? This is frequently where "looks fine today" and "safe to change tomorrow"
+  diverge — treat it as a distinct question from whether today's architecture is sound.
+- **Security boundaries** — this skill isn't a security scanner, but an architecture review that
+  skips trust boundaries entirely is incomplete. Is authentication/authorization applied
+  consistently across externally-reachable entry points, or do some sit unprotected next to
+  protected siblings? Are secrets sourced from a secrets manager, or is there a hardcoded/committed
+  one? Does sensitive data flow into logs, caches, or third-party tooling without redaction? Is
+  input crossing a trust boundary (user input, another team's message, an external API response)
+  validated, or trusted implicitly? Are destructive/privileged operations gated behind anything
+  extra, or handled identically to routine ones?
 - **Vision alignment** — locate whatever the repo treats as its source of product/technical intent
   (a `technical-vision.md`, ADRs, a roadmap doc, a strategy section in the main README). If it
   exists, check whether current architecture decisions actually serve it, or have drifted from it.
@@ -269,6 +291,54 @@ merge-commit attribution skew;
 specifically for what inconsistent adoption *costs* going forward (a fix/change now has to be
 replicated N times instead of landing once) — a distinct finding from Extensibility(a)'s
 existence-of-inconsistency one, not a restatement of it.
+
+**Reliability / resilience**:
+(a) for write/mutation paths (consumers, POST/PUT endpoints, scheduled jobs), check whether
+retry-on-failure is paired with idempotency (idempotency key, unique constraint, upsert) — a retry
+without idempotency is a double-processing risk, not a safety net;
+(b) failure isolation — does a downstream dependency failure (DB, external API, broker) have a
+timeout/circuit-breaker/bulkhead, or can it cascade to the caller? Check actual client config
+(connection/read timeouts, retry budgets), not just whether a client library that supports these
+features is in use;
+(c) poison-message/bad-input handling — trace what actually happens to a message/request that can
+never succeed: infinite retry, DLQ, or silent drop? Read the real failure-strategy config;
+(d) transaction boundaries — for a multi-step operation (e.g. DB write + event publish), what
+happens when step 2 fails after step 1 committed? Look for an outbox pattern or compensating
+action; an undocumented inconsistency window is the finding if neither exists;
+(e) recovery expectations — is there a stated or implied recovery point/time objective, and does
+the actual recovery mechanism (backup, replay, dead-letter reprocessing) plausibly meet it given
+the system's stated criticality?
+
+**Change safety**:
+(a) API/event schema versioning — are breaking changes versioned, with a stated deprecation policy
+for the superseded version, or silent?
+(b) database migration pattern — check actual migration files/history for expand/contract
+(nullable column added, backfilled, then enforced) vs. a live breaking change (column dropped/
+renamed in place) — this is a code/history check, not a doc-policy check;
+(c) consumer/producer compatibility — do consumers tolerate new/unknown fields (forward
+compatibility), and do producers avoid removing fields a consumer still reads? Grep consumer
+deserialization code for strict-vs-lenient field handling;
+(d) rollback safety — would the most recent schema/config/feature change actually roll back
+cleanly, or is it a one-way door (irreversible migration, deleted data, a new field old code can't
+read)?
+(e) gradual-rollout mechanism — for a risky change, is there a feature flag / canary / percentage-
+rollout path, or is every deploy all-or-nothing?
+
+**Security boundaries**:
+(a) authN/authZ ownership — for each externally-reachable entry point, is there a consistent auth
+mechanism, or do some sit unprotected next to protected siblings? Enumerate the actual entry points
+first (from step 1's boundaries claims or a direct grep), then check each one, don't sample;
+(b) secret handling — grep for hardcoded/committed credentials, API keys, tokens; confirm real
+secrets are sourced from a secrets manager/env var, not a checked-in default value;
+(c) sensitive-data flow — does PII/financial data get logged, cached, or sent to third-party/
+observability tooling without apparent redaction? Check actual log statements on the paths that
+touch sensitive fields, not just whether a redaction utility exists somewhere in the codebase;
+(d) trust-boundary input validation — for data crossing a trust boundary (user input, external API
+response, another team's message), is it validated, or trusted implicitly (string-concatenated
+SQL, unchecked deserialization)?
+(e) privileged operations — are destructive/high-privilege actions (delete, bulk update, admin
+operations) gated behind anything beyond routine auth (confirmation, audit log, elevated
+permission), or handled identically to routine operations?
 
 Classify each evaluation-pass finding as `risk` (a concern, no accompanying doc claim to be
 "misaligned" against) or `strength` (a decision worth crediting), tag it with a `dimension` and a

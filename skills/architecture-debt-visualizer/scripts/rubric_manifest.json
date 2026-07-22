@@ -67,6 +67,36 @@
         {"id": "maintainability.a", "letter": "a", "summary": "Use compute_churn.py's bus_factor_hotspots/high_diversity_hotspots — cross-reference any single-author high-churn package against what that code actually does; sanity-check with git log --no-merges before citing it."},
         {"id": "maintainability.b", "letter": "b", "summary": "Check the pattern-doc adoption rate from extensibility.a again here, specifically for what inconsistent adoption costs going forward — a distinct finding from extensibility.a's existence-of-inconsistency one."}
       ]
+    },
+    "reliability-resilience": {
+      "label": "Reliability / Resilience",
+      "checks": [
+        {"id": "reliability-resilience.a", "letter": "a", "summary": "For the system's write/mutation paths (consumers, POST/PUT endpoints, scheduled jobs), is retry-on-failure paired with idempotency (idempotency key, unique constraint, upsert) — or would a retry double-process?"},
+        {"id": "reliability-resilience.b", "letter": "b", "summary": "Failure isolation — does a downstream dependency failure (DB, external API, broker) have a timeout/circuit-breaker/bulkhead, or can it cascade and take down the caller?"},
+        {"id": "reliability-resilience.c", "letter": "c", "summary": "Poison-message/bad-input handling — for consumers/queues, what happens to a message that can never be processed: infinite retry loop, DLQ, or silent drop? Check the actual failure-strategy config, not just its existence."},
+        {"id": "reliability-resilience.d", "letter": "d", "summary": "Transaction boundaries / partial-failure handling — for a multi-step operation (e.g. DB write + event publish), what happens if one step succeeds and the next fails? Look for an outbox pattern, compensating action, or an undocumented inconsistency window."},
+        {"id": "reliability-resilience.e", "letter": "e", "summary": "Recovery expectations — is there a stated or implied recovery point/time objective, and does the actual recovery mechanism (backup, replay, dead-letter reprocessing) match what the system's criticality would require?"}
+      ]
+    },
+    "change-safety": {
+      "label": "Change Safety",
+      "checks": [
+        {"id": "change-safety.a", "letter": "a", "summary": "API/event schema versioning — are breaking changes versioned, and is there a stated deprecation policy for the old version?"},
+        {"id": "change-safety.b", "letter": "b", "summary": "Database migration pattern — evidence of expand/contract (nullable column, backfill, then enforce) vs. a live breaking change (drop/rename column in place)? Check actual migration files/history, not a doc's description of policy."},
+        {"id": "change-safety.c", "letter": "c", "summary": "Consumer/producer compatibility — do consumers tolerate new/unknown fields (forward compatibility), and do producers avoid removing fields a consumer still reads?"},
+        {"id": "change-safety.d", "letter": "d", "summary": "Rollback safety — if a recent deploy needed to be rolled back, would the accompanying schema/config/feature change roll back cleanly, or does it create a one-way door (irreversible migration, deleted data, unread-by-old-code new field)?"},
+        {"id": "change-safety.e", "letter": "e", "summary": "Gradual-rollout mechanism — for a risky change, is there a feature flag / canary / percentage-rollout path, or is every deploy all-or-nothing?"}
+      ]
+    },
+    "security-boundaries": {
+      "label": "Security Boundaries",
+      "checks": [
+        {"id": "security-boundaries.a", "letter": "a", "summary": "AuthN/authZ ownership — for each externally-reachable entry point, is there a clear, consistently-applied auth mechanism, or are some endpoints unprotected/inconsistently protected relative to siblings?"},
+        {"id": "security-boundaries.b", "letter": "b", "summary": "Secret handling — grep for hardcoded/committed credentials, API keys, tokens; confirm real secrets come from a secrets manager/env var, not a checked-in default."},
+        {"id": "security-boundaries.c", "letter": "c", "summary": "Sensitive-data flow — does PII/financial data get logged, cached, or passed to third-party/observability tooling without apparent redaction?"},
+        {"id": "security-boundaries.d", "letter": "d", "summary": "Trust-boundary input validation — for data crossing a trust boundary (user input, external API response, another team's message), is it validated, or trusted implicitly (raw SQL construction, untrusted deserialization)?"},
+        {"id": "security-boundaries.e", "letter": "e", "summary": "Privileged operations — are destructive/high-privilege actions (delete, bulk update, admin operations) gated behind extra checks (confirmation, audit log, elevated permission), or handled the same as routine operations?"}
+      ]
     }
   },
   "system_type_overrides": {
@@ -74,23 +104,32 @@
     "production-service": {},
     "library": {
       "scale-requirements": "informational",
-      "observability": "informational"
+      "observability": "informational",
+      "reliability-resilience": "informational"
     },
     "cli-tool": {
       "scale-requirements": "informational",
       "observability": "informational",
-      "scalability": "informational"
+      "scalability": "informational",
+      "reliability-resilience": "informational",
+      "change-safety": "informational"
     },
     "batch-job": {},
     "prototype": {
       "scale-requirements": "informational",
       "extensibility-requirements": "informational",
-      "vision-alignment": "informational"
+      "vision-alignment": "informational",
+      "reliability-resilience": "informational",
+      "change-safety": "informational",
+      "security-boundaries": "informational"
     },
     "archived": {
       "scale-requirements": "informational",
       "extensibility-requirements": "informational",
-      "observability": "informational"
+      "observability": "informational",
+      "reliability-resilience": "informational",
+      "change-safety": "informational",
+      "security-boundaries": "informational"
     }
   }
 }

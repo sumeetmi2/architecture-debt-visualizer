@@ -23,7 +23,9 @@ Terms used below:
   abstract.
 - **Finding** — one row in the report: a reconciliation result (confirmed / misaligned / gap,
   checked against a real doc claim) or an evaluation result (risk / strength, judged independent of
-  any doc claim) in one of the 9 evaluation dimensions.
+  any doc claim) in one of the 12 evaluation dimensions (9 as of the original check-coverage
+  rewrite; reliability-resilience, change-safety, and security-boundaries added afterward — see
+  below).
 - **Per-dimension checklist coverage** — the evaluation pass defines a fixed set of mandatory,
   individually-named sub-checks per dimension (7 for data-architecture, e.g. identity/PK
   consistency, naming-convention drift, referential integrity, partition maintenance, type choices,
@@ -158,12 +160,19 @@ renders them correctly, but the four headline indicators show `—` since those 
 the first generated after the schema change. Neither set was regenerated to match the other — a
 schema change shouldn't quietly rewrite history.
 
-**Compound checks and rubric breadth:** some lettered checks (e.g. `observability.a`, which asks
-for all four golden signals across 2-3 critical paths in one pass) bundle several distinct facts
-into one check id — real, not yet resolved. The 9-dimension rubric also doesn't yet have dedicated
-checks for reliability/resilience (retries, idempotency, failure isolation), change/deployment
-safety (schema migration, API versioning, rollback safety), or security/trust-boundary concerns —
-flagged in a second external review as the next-highest-value rubric expansion, not yet built.
+**Compound checks:** some lettered checks (e.g. `observability.a`, which asks for all four golden
+signals across 2-3 critical paths in one pass) bundle several distinct facts into one check id —
+real, not yet resolved. A second external review's suggested fix is scoped/parameterized check
+instances (one check id, multiple scope-tagged sub-results) rather than one flat check per lettered
+item — a real schema change, not yet built.
+
+**Reliability/resilience, change-safety, and security-boundaries dimensions** were added after the
+same review (12 dimensions total now, up from 9) with 5 lettered checks each, following the exact
+manifest/applicability-override pattern the original 9 already used. **Not yet cold-run validated**
+the way the check-coverage model itself was — added directly given the pattern was already proven
+3 times in this project, but no fresh cold-agent run has confirmed these specific new checks
+produce sensible, reproducible output yet. Treat these three dimensions as less battle-tested than
+the original 9 until that validation happens.
 
 **Eval harness scope:** `evals/run_evals.py` grades already-generated output; it doesn't invoke the
 skill itself, so it validates the grader and catches regressions in already-produced findings, but
