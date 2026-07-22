@@ -63,17 +63,17 @@ made a difference across testing, not a generic "write good docs" checklist.
   trade-offs accepted, and what's coming next. This is the single most commonly *missing* piece —
   across every real test run, an empty or template-only vision doc was found and flagged. If you
   only add one thing from this list, add real content here, not scaffolding.
-- `patterns/add-<thing>.md` — short "how to add a new consumer / endpoint / calculator" guides.
-  These give the extensibility dimension a concrete, checkable baseline: the skill counts how many
-  actual instances of "X" in your code follow the documented pattern vs. duplicate logic inline.
+- `patterns/add-<thing>.md` — short "how to add a new handler / endpoint / job type" guides. These
+  give the extensibility dimension a concrete, checkable baseline: the skill counts how many actual
+  instances of "X" in your code follow the documented pattern vs. duplicate logic inline.
 
 **Claims should be concrete and falsifiable.** "Service A must not call Service B directly," "all
-payment writes go through the ledger service," "`OrderConsumer` failures are dropped, not
-dead-lettered" — these can be checked against code and produce a real finding either way. "The
-service is scalable" or "we follow best practices" cannot be checked against anything and are
-silently skipped.
+writes to the `orders` table go through `OrderRepository`," "the notification consumer retries a
+failed message up to 3 times before dropping it" — these can be checked against code and produce a
+real finding either way, whatever your actual domain is. "The service is scalable" or "we follow
+best practices" cannot be checked against anything and are silently skipped, regardless of domain.
 
-**Be careful with "complete list" claims.** A table that enumerates "every Kafka consumer" or
+**Be careful with "complete list" claims.** A table that enumerates "every message consumer" or
 "every REST endpoint" is extremely useful when accurate — but it's also the single most common
 source of a *gap* finding, because it silently becomes wrong the moment one more consumer or
 endpoint is added without a matching doc update. This isn't a reason to avoid such tables (they're
@@ -81,11 +81,10 @@ worth having), just an expectation to set: if you have one, expect the skill to 
 it lagging behind, and that's the point.
 
 **Name what's coming next, not just what exists today.** A short "known gaps / forward direction"
-section — a new tenant or business model you're about to onboard, a migration in progress, a
-planned schema change — lets the evaluation pass check whether your current architecture is
-actually ready for it, instead of only judging against today's usage. Some of the most valuable
-findings in testing came from checking a schema against a stated future requirement, not its
-current one.
+section — a new integration, customer segment, data source, or migration you're about to take
+on — lets the evaluation pass check whether your current architecture is actually ready for it,
+instead of only judging against today's usage. Some of the most valuable findings in testing came
+from checking a design against a stated future requirement, not its current one.
 
 **If you keep diagrams, prefer a text format (Mermaid) as the source of truth**, and if you also
 keep a frozen image export (PNG/SVG) alongside it, say explicitly which one wins if they disagree.
@@ -105,9 +104,9 @@ its own schedule, and the skill discovers and reconciles all of them separately 
 
 ### Methodology
 
-Tested against a real, private production monorepo (multi-module Java/Gradle, reactive + batch
-microservices, financial domain — name withheld, not affiliated with this project) rather than a
-toy example. Terms used below:
+Tested against a real, private production monorepo (a large multi-module Java/Gradle microservices
+codebase — name and domain withheld, not affiliated with this project) rather than a toy example.
+Terms used below:
 
 - **Cold agent run** — a fresh Claude Code agent with no memory of any prior run and no visibility
   into other runs, given only the target repo and a plain-language request ("evaluate our
