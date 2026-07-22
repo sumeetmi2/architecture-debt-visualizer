@@ -27,7 +27,7 @@ are language-agnostic. On a non-Java repo, the skill runs fine without the depen
 ## Install
 
 ```
-/plugin marketplace add <your-github-owner>/architecture-debt-visualizer
+/plugin marketplace add sumeetmi2/architecture-debt-visualizer
 /plugin install architecture-debt-visualizer@architecture-debt-visualizer
 ```
 
