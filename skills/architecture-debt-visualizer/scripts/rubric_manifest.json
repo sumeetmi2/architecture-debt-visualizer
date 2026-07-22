@@ -1,0 +1,96 @@
+{
+  "_purpose": "Canonical list of mandatory evaluation-pass checks, one entry per lettered sub-check, grouped by report dimension. references/evaluation-rubric.md (agent-facing prose) and validate_findings.py (enforcement) both read this file so the checklist and the validator cannot drift apart. Each check exists once and gets exactly one coverage record per run: status in {risk, strength, clean, not-applicable, not-assessed}. There is no minimum or maximum finding count anywhere in this file or in how it's used — that model was replaced by mandatory check coverage.",
+  "dimensions": {
+    "scale-requirements": {
+      "label": "Scale Requirements",
+      "checks": [
+        {"id": "scale-requirements.a", "letter": "a", "summary": "Stated target throughput/QPS/TPS or latency/response-time SLO — absent is a risk on its own."},
+        {"id": "scale-requirements.b", "letter": "b", "summary": "Stated growth horizon or expected-scale-in-N-years figure — absent is a second, distinct risk, not a duplicate of (a)."},
+        {"id": "scale-requirements.c", "letter": "c", "summary": "Carry forward whatever was found (or its absence) into the scalability and performance-cost checks — cite the real number, or note explicitly that severity there couldn't be precisely calibrated."}
+      ]
+    },
+    "extensibility-requirements": {
+      "label": "Extensibility Requirements",
+      "checks": [
+        {"id": "extensibility-requirements.a", "letter": "a", "summary": "Named future tenants/integrations/use cases and any stated timeline — absent is a risk."},
+        {"id": "extensibility-requirements.b", "letter": "b", "summary": "Stated bar for how fast/cheaply a new instance of the system's core extension point must be addable — if found, carry it into the extensibility check and judge actual extension cost against it directly."}
+      ]
+    },
+    "vision-alignment": {
+      "label": "Vision Alignment",
+      "checks": [
+        {"id": "vision-alignment.a", "letter": "a", "summary": "Find and read the vision/strategy doc(s) — empty/missing is a risk on its own."},
+        {"id": "vision-alignment.b", "letter": "b", "summary": "Check 2-3 concrete, currently in-flight or recently-made architecture decisions against what the vision claims or should claim."}
+      ]
+    },
+    "data-architecture": {
+      "label": "Data Architecture",
+      "checks": [
+        {"id": "data-architecture.a", "letter": "a", "summary": "Identity/PK consistency — does the ORM's @Id match the real DDL key?"},
+        {"id": "data-architecture.b", "letter": "b", "summary": "Normalization/naming — categorize columns; naming-convention shifts or near-duplicate clusters are historical evidence of ad hoc growth."},
+        {"id": "data-architecture.c", "letter": "c", "summary": "Referential-integrity strategy — grep FOREIGN KEY/REFERENCES across all DDL files, not just one table's."},
+        {"id": "data-architecture.d", "letter": "d", "summary": "Partitioning/sharding maintenance — grep for the actual maintenance job before assuming automation exists; check the partition list's date range against today."},
+        {"id": "data-architecture.e", "letter": "e", "summary": "Type choices — decimal vs float, currency handling."},
+        {"id": "data-architecture.f", "letter": "f", "summary": "Forward-readiness — check the schema against whatever the product vision names as coming next."},
+        {"id": "data-architecture.g", "letter": "g", "summary": "Shadow/parallel representations — does any table store a JSON-blob or otherwise schemaless duplicate of an entity that's normally columnar elsewhere?"}
+      ]
+    },
+    "scalability": {
+      "label": "Scalability",
+      "checks": [
+        {"id": "scalability.a", "letter": "a", "summary": "Grep config files for every hardcoded capacity number (thread/worker/concurrency counts, timeouts, batch sizes, partition/date horizons) — list all of them, don't stop after the first; compare env-overridable vs. literal; note which sit on the highest-traffic path."}
+      ]
+    },
+    "performance-cost": {
+      "label": "Performance / Cost",
+      "checks": [
+        {"id": "performance-cost.a", "letter": "a", "summary": "For every expensive external call (data-warehouse queries, third-party APIs, anything that scales with data scanned), check for a cost/rate guardrail and compare it against how a similar call elsewhere in the same codebase is guarded."}
+      ]
+    },
+    "extensibility": {
+      "label": "Extensibility",
+      "checks": [
+        {"id": "extensibility.a", "letter": "a", "summary": "Use the repo's own \"how to add X\" pattern docs (if any) as a test — do the described steps still match reality, and what fraction of actual instances of X follow the pattern vs. duplicate logic inline (exact count, not an estimate)?"},
+        {"id": "extensibility.b", "letter": "b", "summary": "Look for the same shape of inconsistency in places with no pattern doc at all — two conceptually-identical concerns modeled two structurally different ways elsewhere in the codebase."}
+      ]
+    },
+    "observability": {
+      "label": "Observability",
+      "checks": [
+        {"id": "observability.a", "letter": "a", "summary": "Pick the 2-3 most critical logic paths (highest business impact and/or highest churn) and check all four golden signals — traffic, errors, latency, saturation — separately for each."},
+        {"id": "observability.b", "letter": "b", "summary": "Trace whatever code path is responsible for recovering from/reporting on a known failure mode all the way to its output, and check whether that output is a metric or just a log line."}
+      ]
+    },
+    "maintainability": {
+      "label": "Maintainability",
+      "checks": [
+        {"id": "maintainability.a", "letter": "a", "summary": "Use compute_churn.py's bus_factor_hotspots/high_diversity_hotspots — cross-reference any single-author high-churn package against what that code actually does; sanity-check with git log --no-merges before citing it."},
+        {"id": "maintainability.b", "letter": "b", "summary": "Check the pattern-doc adoption rate from extensibility.a again here, specifically for what inconsistent adoption costs going forward — a distinct finding from extensibility.a's existence-of-inconsistency one."}
+      ]
+    }
+  },
+  "system_type_overrides": {
+    "_note": "Sparse overrides only. Any (system_type, dimension) pair not listed here defaults to 'mandatory' — including every dimension for production-service, and every dimension for any system_type not listed below at all (e.g. an unclassified or low-confidence repo). This is deliberate: uncertainty about what a repo is defaults to the strictest tier, not the most lenient one.",
+    "production-service": {},
+    "library": {
+      "scale-requirements": "informational",
+      "observability": "informational"
+    },
+    "cli-tool": {
+      "scale-requirements": "informational",
+      "observability": "informational",
+      "scalability": "informational"
+    },
+    "batch-job": {},
+    "prototype": {
+      "scale-requirements": "informational",
+      "extensibility-requirements": "informational",
+      "vision-alignment": "informational"
+    },
+    "archived": {
+      "scale-requirements": "informational",
+      "extensibility-requirements": "informational",
+      "observability": "informational"
+    }
+  }
+}
