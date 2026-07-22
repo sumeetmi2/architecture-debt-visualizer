@@ -44,40 +44,50 @@ dimension.
 
 ## Validation
 
-Tested against a real, private production monorepo (multi-module Java/Gradle, reactive +
-batch microservices, financial domain — name withheld, not affiliated with this project) rather
-than a toy example, using a cold-testing methodology: fresh Claude Code agents with zero memory of
-prior runs or of each other, given only the repo and a request to run the skill, so results reflect
-what someone installing this cold would actually get.
+### Methodology
 
-**Reliability, before vs. after tuning the rubric:**
+Tested against a real, private production monorepo (multi-module Java/Gradle, reactive + batch
+microservices, financial domain — name withheld, not affiliated with this project) rather than a
+toy example. Terms used below:
 
-| | Before | After |
+- **Cold agent run** — a fresh Claude Code agent with no memory of any prior run and no visibility
+  into other runs, given only the target repo and a plain-language request ("evaluate our
+  architecture and check if the docs are still accurate"). This is what someone installing the
+  skill for the first time actually experiences — not a run I tuned by hand.
+- **Identical-scope runs** — two or more cold agent runs pointed at the exact same repo and the
+  exact same restricted set of docs, so any difference between their outputs is purely run-to-run
+  variation, not a different task or a different amount of material to review.
+- **Score** — the report's own heuristic 0-100 number (documented in `SKILL.md` and inside every
+  generated report): lower means more, or more severe, unresolved findings. It's designed to track
+  one repo's trend across repeated runs, not to compare different repos or grade "quality" in the
+  abstract.
+- **Finding** — one row in the report: a reconciliation result (confirmed / misaligned / gap,
+  checked against a real doc claim) or an evaluation result (risk / strength, judged independent of
+  any doc claim) in one of the 7 evaluation dimensions.
+- **Per-dimension checklist coverage** — the evaluation pass defines a fixed set of mandatory,
+  individually-named sub-checks per dimension (7 for data-architecture, e.g. identity/PK
+  consistency, naming-convention drift, referential integrity, partition maintenance, type choices,
+  forward-readiness, shadow representations). This measures whether a run actually executed every
+  one of them separately, rather than skipping some or merging two into one finding to save time.
+
+### Reliability, before vs. after tuning the rubric
+
+Earlier versions of the evaluation pass gave agents an open-ended target ("be thorough, find
+15-25+ issues") and left it to each run's own judgment when a dimension was "done." That produced
+wide swings between identical-scope runs. The rubric was changed to a fixed minimum/maximum finding
+count per dimension, a capped scoring formula (no single dimension can dominate the score), and the
+named per-dimension checklist described above.
+
+| Metric | Before the rubric fix | After the rubric fix |
 |---|---|---|
-| Score range across identical-scope runs | 68 points (12-80) | 13 points (28-41) |
-| Finding-count range across identical-scope runs | 17 (11-28) | 6 (30-36) |
-| Per-dimension checklist coverage | ad hoc, agent's own judgment | 7/7 mandatory sub-checks hit, 3 runs straight |
+| Score range across identical-scope runs | 68 points (lowest 12, highest 80) | 13 points (lowest 28, highest 41) |
+| Finding-count range across identical-scope runs | 17 (lowest 11, highest 28) | 6 (lowest 30, highest 36) |
+| Per-dimension checklist coverage | Not tracked — left to each run's judgment | All 7 named sub-checks hit individually, confirmed across 3 separate identical-scope runs |
 
-Every high-severity finding from a deep, human-guided reference pass was independently
-rediscovered by cold agents that never saw that reference — including cases where two separate
-agents, given the identical prompt and scope, found the exact same issue via different evidence
-paths.
-
-**Representative findings** (patterns, not verbatim — specifics of the tested repo are withheld):
-
-- A shared internal library was quietly extracted from the repo into an external package
-  dependency; five separate documentation pages still described it as in-repo source, including
-  frontmatter citing a file path that had been deleted weeks earlier.
-- An entire message-queue consumer existed in production code with zero documentation, silently
-  invalidating a doc's own "here is the complete list" claim elsewhere.
-- A core database table's date-based partitioning was hardcoded to run out within months, with no
-  automated job anywhere in the codebase to extend it — a scaling cliff with a forecastable date.
-- A live, traffic-serving code path had solid request/error counters but no latency or backlog
-  signal, while a *disabled*, dormant sibling path was fully instrumented — the reverse of where
-  observability investment should have gone.
-- A "distinct contributor count" signal that looked like healthy shared ownership was actually one
-  person dominating every package it flagged — invisible unless you cross-check the raw commit
-  data instead of trusting the aggregate.
+Separately, every high-severity finding produced by a deep, human-guided reference pass over the
+same repo was independently rediscovered by cold agents that never saw that reference pass or its
+findings — including cases where two agents, given the identical prompt and scope, arrived at the
+same conclusion via different evidence.
 
 ## License
 

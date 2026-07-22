@@ -191,9 +191,9 @@ components and a specific relationship or behavior:
 
 - "Service A must not call Service B directly" (boundary claim)
 - "All payment writes go through the ledger service" (data-flow claim)
-- "The `XShopConsumer` failures are dropped, not sent to a DLQ" (behavioral claim)
+- "The `PaymentEventConsumer` failures are dropped, not sent to a DLQ" (behavioral claim)
 - "No gRPC server exists despite the generated protos" (negative/absence claim)
-- "`OrderAccountingResource` handles `/api/v1/order-accounting/calculate`" (routing claim)
+- "`OrderResource` handles `/api/v1/orders/calculate`" (routing claim)
 
 Skip claims that are subjective, aspirational without a concrete referent, or already phrased as
 open questions (docs sometimes literally write `(?)` — that's the doc admitting uncertainty, not
@@ -442,11 +442,10 @@ step."
 can never stand bare.** For an evaluation-pass finding with no doc quote to react to, there are two
 acceptable ways to phrase `claim`, and one unacceptable one:
 
-- **Preferred: state the concern or fact directly**, as a declarative sentence — "Codapay
-  transaction consumer concurrency is hardcoded to 1 with no env override, on the always-enabled
-  revenue path" rather than "the Codapay consumer can absorb load increases without a config
-  change." This is usually the clearer choice and matches how a reconciliation finding with a real
-  doc quote reads.
+- **Preferred: state the concern or fact directly**, as a declarative sentence — "Payment-event
+  consumer concurrency is hardcoded to 1 with no env override, on the always-enabled revenue path"
+  rather than "the payment consumer can absorb load increases without a config change." This is
+  usually the clearer choice and matches how a reconciliation finding with a real doc quote reads.
 - **Acceptable: phrase it as the hypothesis being tested, but prefix it** with `(Architectural
   evaluation)` (or `(Implicit)` for a reconciliation-pass finding inferred from a doc's silence
   rather than a direct quote) — "(Architectural evaluation) The system has a written technical
@@ -476,32 +475,32 @@ Write a file (`$RUN_DIR/findings.json`) matching this schema:
   "findings": [
     {
       "id": "f1",
-      "claim": "Kafka consumer failures on the xShop channel are dropped, not sent to a DLQ",
+      "claim": "Kafka consumer failures on the order-events channel are dropped, not sent to a DLQ",
       "doc_source": "docs/boundaries.md",
-      "doc_location": "Kafka consumers table, dist.xshop.fulfilled_orders row",
+      "doc_location": "Kafka consumers table, order-events-fulfilled row",
       "classification": "confirmed",
       "dimension": "correctness",
       "severity": "info",
-      "packages": ["com.codapayments.pricing.engine.consumer"],
+      "packages": ["com.example.app.consumer"],
       "evidence": [
-        {"file": "src/main/java/.../XShopConsumer.java", "line": 42, "note": "failure-strategy=ignore annotation, no DLQ producer"}
+        {"file": "src/main/java/.../OrderEventConsumer.java", "line": 42, "note": "failure-strategy=ignore annotation, no DLQ producer"}
       ],
       "explanation": "Code matches: the consumer's @Incoming annotation sets failure-strategy=ignore and there is no -dlq producer anywhere in the consumer package."
     },
     {
       "id": "f2",
-      "claim": "OrderAccounting's JPA @Id doesn't match its real (composite, partitioned) DDL primary key",
+      "claim": "Order's JPA @Id doesn't match its real (composite, partitioned) DDL primary key",
       "doc_source": "docs/data-model.md",
-      "doc_location": "Entities by domain > Order Accounting",
+      "doc_location": "Entities by domain > Orders",
       "classification": "risk",
       "dimension": "data-architecture",
       "severity": "high",
       "packages": [],
       "evidence": [
-        {"file": "sql/0007-OrderAccounting.sql", "line": 93, "note": "PRIMARY KEY (`PaymentCompletedDate`, `ReferenceId`)"},
-        {"note": "entity source lives outside this repo (published dependency) — doc states JPA @Id referenceId only, a single column"}
+        {"file": "sql/0007-Order.sql", "line": 93, "note": "PRIMARY KEY (`CompletedDate`, `OrderId`)"},
+        {"note": "entity source lives outside this repo (published dependency) — doc states JPA @Id orderId only, a single column"}
       ],
-      "explanation": "Hibernate's identity/equality/caching model is keyed on referenceId alone while the real relational key is composite. Two rows with the same referenceId but different paymentCompletedDate would collide as 'the same entity' from the ORM's point of view.",
+      "explanation": "Hibernate's identity/equality/caching model is keyed on orderId alone while the real relational key is composite. Two rows with the same orderId but different completedDate would collide as 'the same entity' from the ORM's point of view.",
       "recommendation": "Confirm whether this has ever caused a merge/cache collision in production; if the composite key is load-bearing, map it as an @IdClass/@EmbeddedId instead of a single @Id."
     }
   ]
