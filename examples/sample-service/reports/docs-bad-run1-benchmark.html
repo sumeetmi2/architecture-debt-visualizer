@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Architecture Debt Report — sample-service (docs-bad)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
+          background: #0f172a; color: #e2e8f0; }
+  header { padding: 24px 32px; border-bottom: 1px solid #1e293b; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .subtitle { color: #94a3b8; font-size: 13px; }
+  .summary { display: flex; gap: 12px; padding: 16px 32px; flex-wrap: wrap; }
+  .stat { padding: 10px 16px; border-radius: 8px; background: #1e293b; font-size: 13px; }
+  .stat b { font-size: 18px; display: block; }
+  .stat.confirmed { border-left: 4px solid #16a34a; }
+  .stat.misaligned { border-left: 4px solid #dc2626; }
+  .stat.gap { border-left: 4px solid #d97706; }
+  .stat.risk { border-left: 4px solid #a855f7; }
+  .stat.strength { border-left: 4px solid #0ea5e9; }
+  .score-card { margin: 0 32px 16px; padding: 16px 20px; border-radius: 12px; background: #111827;
+                 border: 1px solid #1e293b; display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+  .score-number { font-size: 36px; font-weight: 700; color: #e2e8f0; }
+  .score-max { font-size: 16px; color: #64748b; font-weight: 400; }
+  .score-label { font-size: 14px; color: #cbd5e1; }
+  .score-math { font-size: 12px; }
+  .score-philosophy { flex-basis: 100%; margin-top: 8px; }
+  .score-philosophy summary { cursor: pointer; font-size: 12px; color: #7dd3fc; }
+  .score-philosophy p { font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 8px 0 0; }
+  main { display: flex; gap: 24px; padding: 0 32px 32px; flex-wrap: wrap; align-items: flex-start; }
+  .left-panel { flex: 1 1 380px; min-width: 300px; display: flex; flex-direction: column; gap: 20px; }
+  .panel-card { background: #111827; border-radius: 12px; padding: 16px; border: 1px solid #1e293b; }
+  .panel-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 10px;
+                   text-transform: uppercase; letter-spacing: .03em; }
+  .insight-block + .insight-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid #1e293b; }
+  .insight-title { font-size: 12.5px; font-weight: 600; color: #cbd5e1; }
+  .insight-stats { font-size: 12px; color: #94a3b8; margin: 4px 0 10px; }
+  .insight-sub { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .03em; margin: 10px 0 4px; }
+  .insight-list { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+  .insight-list li { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }
+  .insight-list code { color: #7dd3fc; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; }
+  .insight-list .muted { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+  .insight-list b { color: #e2e8f0; }
+  .key-findings-list { list-style: none; margin: 0; padding: 0; }
+  .key-finding { border-bottom: 1px solid #1e293b; }
+  .key-finding:last-child { border-bottom: none; }
+  .key-finding-link { display: flex; gap: 8px; align-items: baseline; padding: 8px 0; text-decoration: none; color: inherit; }
+  .key-finding-claim { font-size: 12.5px; color: #e2e8f0; }
+  .table-panel { flex: 2 1 640px; min-width: 320px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: top; }
+  th { color: #94a3b8; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-confirmed { background: #16a34a33; color: #4ade80; }
+  .badge-misaligned { background: #dc262633; color: #f87171; }
+  .badge-gap { background: #d9770633; color: #fbbf24; }
+  .badge-risk { background: #a855f733; color: #d8b4fe; }
+  .badge-strength { background: #0ea5e933; color: #7dd3fc; }
+  .badge-sev-high { background: #7f1d1d; color: #fecaca; }
+  .badge-sev-medium { background: #78350f; color: #fde68a; }
+  .badge-sev-low { background: #1e293b; color: #94a3b8; }
+  .dim-tag { color: #64748b; font-size: 10.5px; margin-top: 4px; }
+  .explanation { color: #94a3b8; font-size: 12px; margin-top: 4px; }
+  .recommendation { color: #d8b4fe; font-size: 12px; margin-top: 6px; }
+  .muted { color: #64748b; font-size: 11px; }
+  .evidence { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; }
+  .filters { padding: 4px 32px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .filters .group-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
+  .filters button { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px;
+                      padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  .filters button.active { background: #334155; border-color: #64748b; }
+  tr.hidden { display: none; }
+  tr.flash { outline: 2px solid #38bdf8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Architecture Debt Report — sample-service (docs-bad)</h1>
+  <div class="subtitle">Doc sources: examples/sample-service/docs-bad/architecture.md, examples/sample-service/docs-bad/boundaries.md, examples/sample-service/docs-bad/data-model.md, examples/sample-service/docs-bad/technical-vision.md, examples/sample-service/docs-good/technical-vision.md (evaluation-pass reference only, outside reconciliation scope), examples/sample-service/docs-good/patterns/add-a-consumer.md (evaluation-pass reference only, outside reconciliation scope)</div>
+</header>
+
+    <div class="score-card">
+      <div class="score-number">30<span class="score-max">/100</span></div>
+      <div class="score-label">Significant debt — treat as a priority</div>
+      <div class="score-math muted">-73 debt penalty, +3 strength credit</div>
+      <details class="score-philosophy">
+        <summary>Score philosophy — read before treating this as a grade</summary>
+        <p>Heuristic, debt-weighted signal, not a certified quality score. Only <b>risk</b>,
+        <b>misaligned</b>, and <b>gap</b> findings count against it, weighted by severity
+        (high=6, medium=3, low=1, info=0) and summed <b>per dimension, each dimension capped at
+        15</b> before those capped totals are added together — <b>confirmed</b> findings are the
+        expected baseline and don't move it; <b>strength</b> findings give a small capped bonus
+        (+1 each, max +5) without buying back debt found elsewhere. The per-dimension cap exists so
+        one unusually issue-rich dimension can't swing the whole score on its own — score
+        differences should track breadth of concern across the system, not which single area
+        happened to turn up the most.</p>
+        <p><b>Known limitations:</b> deeper review surfaces more findings, so this number isn't
+        comparable across repos or across runs at different scope/depth — use it to track one
+        repo's trend as issues get fixed, not to rank systems against each other. Findings aren't
+        independent (several here share one root cause and are still penalized separately). It
+        reflects severity as judged during this review, not business impact or likelihood.</p>
+      </details>
+    </div>
+    
+<div class="summary">
+  <div class="stat confirmed"><b>5</b>Confirmed</div>
+  <div class="stat misaligned"><b>1</b>Misaligned</div>
+  <div class="stat gap"><b>3</b>Gaps</div>
+  <div class="stat risk"><b>20</b>Architecture Risks</div>
+  <div class="stat strength"><b>3</b>Strengths</div>
+</div>
+<div class="filters" id="cls-filters">
+  <span class="group-label">Type</span>
+  <button class="active" data-filter-group="cls" data-filter="all">All</button>
+  <button data-filter-group="cls" data-filter="confirmed">Confirmed</button>
+  <button data-filter-group="cls" data-filter="misaligned">Misaligned</button>
+  <button data-filter-group="cls" data-filter="gap">Gaps</button>
+  <button data-filter-group="cls" data-filter="risk">Risks</button>
+  <button data-filter-group="cls" data-filter="strength">Strengths</button>
+</div>
+<div class="filters" id="dim-filters">
+  <span class="group-label">Dimension</span>
+  <button class="active" data-filter-group="dim" data-filter="all">All</button>
+  <button data-filter-group="dim" data-filter="correctness">Correctness</button>
+  <button data-filter-group="dim" data-filter="scale-requirements">Scale Requirements</button>
+  <button data-filter-group="dim" data-filter="extensibility-requirements">Extensibility Requirements</button>
+  <button data-filter-group="dim" data-filter="scalability">Scalability</button>
+  <button data-filter-group="dim" data-filter="extensibility">Extensibility</button>
+  <button data-filter-group="dim" data-filter="maintainability">Maintainability</button>
+  <button data-filter-group="dim" data-filter="performance-cost">Performance / Cost</button>
+  <button data-filter-group="dim" data-filter="data-architecture">Data Architecture</button>
+  <button data-filter-group="dim" data-filter="observability">Observability</button>
+  <button data-filter-group="dim" data-filter="vision-alignment">Vision Alignment</button>
+</div>
+<main>
+  <div class="left-panel">
+    <div class="panel-card">
+      <div class="panel-title">Key pressing findings</div>
+      <ul class="key-findings-list">
+        <li class="key-finding" data-sev="high">
+          <a href="#row-f6" class="key-finding-link">
+            <span class="badge badge-misaligned">Misaligned</span>
+            <span class="badge badge-sev-high">High</span>
+            <span class="key-finding-claim">Task&#x27;s primary key is a single `id` field (JPA `@Id`)</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="high">
+          <a href="#row-f8" class="key-finding-link">
+            <span class="badge badge-gap">Gap</span>
+            <span class="badge badge-sev-high">High</span>
+            <span class="key-finding-claim">boundaries.md&#x27;s Message Consumers table lists only the task-events channel</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="high">
+          <a href="#row-f14" class="key-finding-link">
+            <span class="badge badge-risk">Risk</span>
+            <span class="badge badge-sev-high">High</span>
+            <span class="key-finding-claim">docs-bad/technical-vision.md contains no real content — only HTML-comment section prompts under Design Philosophy / Key Architectural Decisions / Future Direction.</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="high">
+          <a href="#row-f16" class="key-finding-link">
+            <span class="badge badge-risk">Risk</span>
+            <span class="badge badge-sev-high">High</span>
+            <span class="key-finding-claim">The Task entity&#x27;s Hibernate identity (@Id id) doesn&#x27;t match the table&#x27;s real primary key (composite CreatedDate+Id), and docs-bad never discloses this as a known, accepted tradeoff the way docs-good does.</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="high">
+          <a href="#row-f29" class="key-finding-link">
+            <span class="badge badge-risk">Risk</span>
+            <span class="badge badge-sev-high">High</span>
+            <span class="key-finding-claim">None of the three highest-impact logic paths (TaskEventConsumer, TaskReminderConsumer, TaskCleanupJob&#x27;s archival sweep) have any traffic, error, latency, or saturation instrumentation.</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="high">
+          <a href="#row-f30" class="key-finding-link">
+            <span class="badge badge-risk">Risk</span>
+            <span class="badge badge-sev-high">High</span>
+            <span class="key-finding-claim">The task-events/task-reminders drop-on-failure behavior has no metric — or even a log line — tracking how many messages are actually dropped.</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="medium">
+          <a href="#row-f7" class="key-finding-link">
+            <span class="badge badge-gap">Gap</span>
+            <span class="badge badge-sev-medium">Medium</span>
+            <span class="key-finding-claim">boundaries.md&#x27;s HTTP API table (title: &#x27;Complete I/O map for the tasks service&#x27;) lists only POST /api/v1/tasks and GET /api/v1/tasks/{id}</span>
+          </a>
+        </li>
+        
+        <li class="key-finding" data-sev="medium">
+          <a href="#row-f9" class="key-finding-link">
+            <span class="badge badge-gap">Gap</span>
+            <span class="badge badge-sev-medium">Medium</span>
+            <span class="key-finding-claim">data-model.md cites sql/001-task.sql as its source for the Task table</span>
+          </a>
+        </li>
+        </ul>
+    </div>
+    <div class="panel-card">
+      <div class="panel-title">Static code analysis</div>
+      
+        <div class="insight-block">
+          <div class="insight-title">Dependency graph</div>
+          <div class="insight-stats">6 packages · 7 classes · 5 cross-package import edges</div>
+          <div class="insight-sub">Most-coupled packages (fan-in + fan-out)</div>
+          <ol class="insight-list">
+            <li><code>entity</code><span class='muted'> — com.example.tasks.entity</span><b>3</b></li><li><code>service</code><span class='muted'> — com.example.tasks.service</span><b>3</b></li><li><code>repository</code><span class='muted'> — com.example.tasks.repository</span><b>2</b></li><li><code>resource</code><span class='muted'> — com.example.tasks.resource</span><b>2</b></li>
+          </ol>
+          <div class="insight-sub">Largest packages (class count)</div>
+          <ol class="insight-list">
+            <li><code>consumer</code><span class='muted'> — com.example.tasks.consumer</span><b>2</b></li><li><code>entity</code><span class='muted'> — com.example.tasks.entity</span><b>1</b></li><li><code>repository</code><span class='muted'> — com.example.tasks.repository</span><b>1</b></li><li><code>resource</code><span class='muted'> — com.example.tasks.resource</span><b>1</b></li><li><code>scheduler</code><span class='muted'> — com.example.tasks.scheduler</span><b>1</b></li>
+          </ol>
+        </div>
+        
+
+        <div class="insight-block">
+          <div class="insight-title">Git churn (since 180 days ago)</div>
+          <div class="insight-sub">Highest-churn packages (commits touching them)</div>
+          <ol class="insight-list">
+            <li><code>consumer</code><span class='muted'> — com.example.tasks.consumer</span><b>2</b></li><li><code>resource</code><span class='muted'> — com.example.tasks.resource</span><b>1</b></li><li><code>entity</code><span class='muted'> — com.example.tasks.entity</span><b>1</b></li><li><code>scheduler</code><span class='muted'> — com.example.tasks.scheduler</span><b>1</b></li><li><code>service</code><span class='muted'> — com.example.tasks.service</span><b>1</b></li>
+          </ol>
+        </div>
+        
+    </div>
+  </div>
+  <div class="table-panel">
+    <table>
+      <thead><tr><th>Finding</th><th>Claim / Explanation</th><th>Doc source</th><th>Code evidence</th></tr></thead>
+      <tbody id="findings-body">
+        <tr class="finding-row" id="row-f1" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>`resource/TaskResource` is the REST API for creating and fetching tasks, exposing `POST /api/v1/tasks` and `GET /api/v1/tasks/{id}`<div class="explanation">Both documented endpoints exist and are wired exactly as described.</div></td><td>examples/sample-service/docs-bad/architecture.md<div class="muted">Key Components table, TaskResource row; boundaries.md HTTP API table</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java:10 — @Path(&quot;/api/v1/tasks&quot;)<br>examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java:16 — @POST create(Task)<br>examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java:22 — @GET @Path(&quot;/{id}&quot;) get(id)</td></tr>
+<tr class="finding-row" id="row-f2" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>`consumer/TaskEventConsumer` handles task lifecycle events from the queue<div class="explanation">Matches: an @ApplicationScoped bean consumes the task-events channel.</div></td><td>examples/sample-service/docs-bad/architecture.md<div class="muted">Key Components table, TaskEventConsumer row</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java:14 — @Incoming(&quot;task-events&quot;) onTaskEvent(String payload)</td></tr>
+<tr class="finding-row" id="row-f3" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>`scheduler/TaskCleanupJob` archives old completed tasks on a schedule<div class="explanation">Matches: a scheduled job runs hourly and is described as archiving old completed tasks.</div></td><td>examples/sample-service/docs-bad/architecture.md<div class="muted">Key Components table, TaskCleanupJob row</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java:16 — @Scheduled(every = &quot;1h&quot;)<br>examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java:18 — comment: moves completed tasks older than retention window into TaskArchive</td></tr>
+<tr class="finding-row" id="row-f4" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>task-events channel: Task lifecycle events. Failures are dropped (failure-strategy=ignore), best-effort delivery.<div class="explanation">Matches: the channel&#x27;s failure-strategy is literally &#x27;ignore&#x27; in config.</div></td><td>examples/sample-service/docs-bad/boundaries.md<div class="muted">Message Consumers table, task-events row</div></td><td class="evidence">examples/sample-service/src/main/resources/application.properties:4 — mp.messaging.incoming.task-events.failure-strategy=ignore</td></tr>
+<tr class="finding-row" id="row-f5" data-cls="confirmed" data-dim="data-architecture" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Data Architecture · Info</div></td><td>Task fields: status, assigneeId, priority, createdAt, completedAt<div class="explanation">All five listed fields exist on the entity with matching names/types.</div></td><td>examples/sample-service/docs-bad/data-model.md<div class="muted">Task section, field list</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/entity/Task.java:19 — status, assigneeId, priority, createdAt, completedAt all present</td></tr>
+<tr class="finding-row" id="row-f6" data-cls="misaligned" data-dim="data-architecture" data-sev="high"><td><span class="badge badge-misaligned">Misaligned</span><div class="dim-tag">Data Architecture · High</div></td><td>Task&#x27;s primary key is a single `id` field (JPA `@Id`)<div class="explanation">The doc&#x27;s frontmatter cites sql/001-task.sql as a source, but describes only the JPA @Id and never discloses that the real relational key is composite and the table is partitioned by CreatedDate. Read at face value the doc leaves a reader believing entity identity and DB identity agree; they don&#x27;t.</div><div class="recommendation"><b>Recommendation:</b> Either map the real composite key with @IdClass/@EmbeddedId, or explicitly disclose (as docs-good/data-model.md does) that this is a known, accepted identity/equality risk.</div></td><td>examples/sample-service/docs-bad/data-model.md<div class="muted">Task section, line 12</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/entity/Task.java:16 — @Id private String id; — single-column identity<br>examples/sample-service/sql/001-task.sql:20 — PRIMARY KEY (`CreatedDate`, `Id`) — real key is composite</td></tr>
+<tr class="finding-row" id="row-f7" data-cls="gap" data-dim="correctness" data-sev="medium"><td><span class="badge badge-gap">Gap</span><div class="dim-tag">Correctness · Medium</div></td><td>boundaries.md&#x27;s HTTP API table (title: &#x27;Complete I/O map for the tasks service&#x27;) lists only POST /api/v1/tasks and GET /api/v1/tasks/{id}<div class="explanation">A third, fully-wired endpoint exists and is never mentioned in boundaries.md&#x27;s table or architecture.md&#x27;s component description, even though the doc&#x27;s own title claims completeness.</div></td><td>examples/sample-service/docs-bad/boundaries.md<div class="muted">HTTP API table + document title</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java:31 — @POST @Path(&quot;/bulk-import&quot;) bulkImport(List&lt;Task&gt;) — real, wired endpoint</td></tr>
+<tr class="finding-row" id="row-f8" data-cls="gap" data-dim="correctness" data-sev="high"><td><span class="badge badge-gap">Gap</span><div class="dim-tag">Correctness · High</div></td><td>boundaries.md&#x27;s Message Consumers table lists only the task-events channel<div class="explanation">A second, enabled-by-default consumer channel exists and is entirely absent from the table presenting itself as the complete consumer list, and from architecture.md&#x27;s component table too.</div></td><td>examples/sample-service/docs-bad/boundaries.md<div class="muted">Message Consumers table (single row)</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java:14 — @Incoming(&quot;task-reminders&quot;) — real, wired consumer<br>examples/sample-service/src/main/resources/application.properties:12 — task-reminders.enabled=${TASK_REMINDERS_CONSUMER_ENABLED:true} — enabled by default</td></tr>
+<tr class="finding-row" id="row-f9" data-cls="gap" data-dim="data-architecture" data-sev="medium"><td><span class="badge badge-gap">Gap</span><div class="dim-tag">Data Architecture · Medium</div></td><td>data-model.md cites sql/001-task.sql as its source for the Task table<div class="explanation">The doc names the DDL file as its source but the body never mentions that the table is partitioned at all, despite this directly affecting how CreatedDate must be used and how the archival job stays cheap.</div></td><td>examples/sample-service/docs-bad/data-model.md<div class="muted">frontmatter &#x27;sources:&#x27; list</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:23 — PARTITION BY RANGE COLUMNS(`CreatedDate`) — architecturally significant, not mentioned anywhere in the doc body</td></tr>
+<tr class="finding-row" id="row-f10" data-cls="risk" data-dim="scale-requirements" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Scale Requirements · Medium</div></td><td>No stated target throughput/QPS/TPS or latency/response-time SLO exists anywhere in the audited docs-bad doc set.<div class="explanation">Per SKILL.md&#x27;s scale-requirements check (1a), this absence is itself a finding: every scalability judgment made later in this report is necessarily uncalibrated without it.</div><div class="recommendation"><b>Recommendation:</b> Have an owner write a concrete peak QPS/TPS and p99 latency target into the vision doc so hardcoded-capacity findings can be judged against a real number instead of guesswork.</div></td><td>examples/sample-service/docs-bad/technical-vision.md<div class="muted">entire file — HTML-comment scaffolding only, no filled-in content</div></td><td class="evidence"> — Searched docs-bad/architecture.md, boundaries.md, data-model.md, technical-vision.md for throughput/QPS/TPS/latency/SLO keywords — none found. technical-vision.md (lines 1-16) contains only unfilled HTML-comment prompts under &#x27;Design Philosophy&#x27;, &#x27;Key Architectural Decisions&#x27;, &#x27;Future Direction&#x27;.</td></tr>
+<tr class="finding-row" id="row-f11" data-cls="risk" data-dim="scale-requirements" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Scale Requirements · Medium</div></td><td>No stated growth horizon or expected-scale-in-N-years figure exists anywhere in the audited docs-bad doc set.<div class="explanation">Per SKILL.md 1(b), this is a distinct finding from f10 (no target rate) — there is also no stated horizon over which any target would need to hold.</div><div class="recommendation"><b>Recommendation:</b> State an expected growth horizon (e.g. &#x27;3x within 12 months&#x27;) alongside the throughput target so capacity decisions have a timeframe to plan against.</div></td><td>examples/sample-service/docs-bad/technical-vision.md<div class="muted">entire file — scaffolding only</div></td><td class="evidence"> — Same search as f10; no growth-horizon or &#x27;Nx users by &lt;year&gt;&#x27; language anywhere in docs-bad.</td></tr>
+<tr class="finding-row" id="row-f12" data-cls="risk" data-dim="extensibility-requirements" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Extensibility Requirements · Medium</div></td><td>No named future tenants, integrations, or use-cases (nor a timeline for them) are documented anywhere in the audited docs-bad doc set.<div class="explanation">Per SKILL.md 2(a): this absence means later extensibility findings can&#x27;t be checked against a concrete future-need target.</div><div class="recommendation"><b>Recommendation:</b> Name at least the next 1-2 planned extensions (e.g. specific new message channels) and roughly when they&#x27;re expected, so extension-cost findings have a real target.</div></td><td>examples/sample-service/docs-bad/technical-vision.md<div class="muted">&#x27;Future Direction&#x27; heading — comment prompt only, no content</div></td><td class="evidence"> — docs-bad/technical-vision.md&#x27;s &#x27;Future Direction&#x27; section (line 13-15) is an empty comment prompt; no other docs-bad file names a future channel/tenant/integration.</td></tr>
+<tr class="finding-row" id="row-f13" data-cls="risk" data-dim="extensibility-requirements" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Extensibility Requirements · Medium</div></td><td>No stated bar for how quickly a new extension point (e.g. a new message channel) must be addable is documented anywhere in the audited docs-bad doc set.<div class="explanation">Per SKILL.md 2(b): without this, the extension-cost strength found later (f28) can&#x27;t be judged against a real bar, only reported as a raw fact.</div><div class="recommendation"><b>Recommendation:</b> State a concrete bar (e.g. &#x27;a new consumer should take under a day&#x27;) so future extension-cost measurements have a pass/fail line.</div></td><td>examples/sample-service/docs-bad/technical-vision.md<div class="muted">entire file — scaffolding only</div></td><td class="evidence"> — No &#x27;should take under X time&#x27; or similar language anywhere in docs-bad.</td></tr>
+<tr class="finding-row" id="row-f14" data-cls="risk" data-dim="vision-alignment" data-sev="high"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Vision Alignment · High</div></td><td>docs-bad/technical-vision.md contains no real content — only HTML-comment section prompts under Design Philosophy / Key Architectural Decisions / Future Direction.<div class="explanation">Per SKILL.md 3(a): a system operating without any written technical vision has no anchor for judging whether new work is on-strategy — this is the same underlying gap that makes f10-f13 uncalibrated.</div><div class="recommendation"><b>Recommendation:</b> Fill in the vision doc; the sibling docs-good/technical-vision.md shows the shape a real one should take (concrete numbers, named tradeoffs, a Future Direction section), though content should reflect this team&#x27;s actual decisions, not be copied verbatim.</div></td><td>examples/sample-service/docs-bad/technical-vision.md<div class="muted">entire file</div></td><td class="evidence">examples/sample-service/docs-bad/technical-vision.md:1 — every heading (lines 5, 9, 13) is followed only by an HTML comment prompt, never filled in</td></tr>
+<tr class="finding-row" id="row-f15" data-cls="risk" data-dim="vision-alignment" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Vision Alignment · Medium</div></td><td>The task-reminders consumer — a real, enabled-by-default channel — has no corresponding entry in docs-bad&#x27;s vision doc to confirm whether adding it was an on-strategy decision.<div class="explanation">Per SKILL.md 3(b): checking a recently-added architecture decision (this consumer) against the vision doc is impossible here because there&#x27;s nothing to check it against — a direct consequence of f14.</div><div class="recommendation"><b>Recommendation:</b> Once the vision doc is filled in, retroactively record why task-reminders was added, so the next channel addition has a real precedent to be checked against.</div></td><td>examples/sample-service/docs-bad/technical-vision.md<div class="muted">&#x27;Key Architectural Decisions&#x27; heading — empty</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java:12 — a second, real consumer class exists<br>examples/sample-service/docs-bad/technical-vision.md:9 — &#x27;Key Architectural Decisions&#x27; section has no content to check this addition against</td></tr>
+<tr class="finding-row" id="row-f16" data-cls="risk" data-dim="data-architecture" data-sev="high"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Data Architecture · High</div></td><td>The Task entity&#x27;s Hibernate identity (@Id id) doesn&#x27;t match the table&#x27;s real primary key (composite CreatedDate+Id), and docs-bad never discloses this as a known, accepted tradeoff the way docs-good does.<div class="explanation">Beyond the doc-accuracy question already covered in f6: two Task rows sharing an id but differing in CreatedDate would collide as &#x27;the same entity&#x27; under Hibernate&#x27;s default identity/equality/caching model — a correctness landmine, not a style nit. docs-good/data-model.md discloses this explicitly as an accepted, tracked risk; docs-bad&#x27;s silence means a team relying on it has no record that this was a deliberate tradeoff versus an oversight.</div><div class="recommendation"><b>Recommendation:</b> Map the composite key via @IdClass/@EmbeddedId if it&#x27;s load-bearing, or explicitly document the tradeoff and its mitigation (e.g. never caching Task by id alone).</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/entity/Task.java:16 — single-column @Id<br>examples/sample-service/sql/001-task.sql:20 — composite PRIMARY KEY (CreatedDate, Id)</td></tr>
+<tr class="finding-row" id="row-f17" data-cls="risk" data-dim="data-architecture" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Data Architecture · Medium</div></td><td>The Task table&#x27;s columns show a naming-convention drift: Id/Status/CreatedDate/CreatedAt/CompletedAt are PascalCase while priority/assigneeId — added later — are camelCase.<div class="explanation">A direct grep across all 7 columns shows a clean 5-vs-2 split by casing convention with no mixed cases within either group — strong, unambiguous evidence the table grew ad hoc across at least two unreviewed batches rather than under one enforced convention.</div><div class="recommendation"><b>Recommendation:</b> Pick one convention and enforce it via migration review/lint before more columns are added; a naming-convention check costs little and compounds in value every time the table grows again.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:13 — Id, Status, CreatedDate, CreatedAt, CompletedAt — PascalCase (5 columns)<br>examples/sample-service/sql/001-task.sql:18 — priority, assigneeId — camelCase (2 columns), no backticks-cased consistency with the rest</td></tr>
+<tr class="finding-row" id="row-f18" data-cls="risk" data-dim="data-architecture" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Data Architecture · Medium</div></td><td>assigneeId is indexed as if it references a user/assignee entity, but the schema has zero FOREIGN KEY/REFERENCES constraints anywhere.<div class="explanation">Referential integrity here is app-level only (in fact currently not enforced at all, since TaskRepository is a stub). This is tolerable with a single table, but there&#x27;s no evidence it&#x27;s a deliberate, documented tradeoff versus just how the table happened to be written — worth deciding on purpose before a real Assignee/User table exists to reference.</div><div class="recommendation"><b>Recommendation:</b> When a real Assignee/User table is introduced, decide explicitly whether assigneeId gets a real FK or stays app-enforced, and document that choice rather than leaving it implicit.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:19 — assigneeId VARCHAR(36) — shape of a foreign key<br>examples/sample-service/sql/001-task.sql:21 — INDEX IdxAssignee(assigneeId) — indexed for lookup, but no REFERENCES<br> — grep &#x27;FOREIGN KEY|REFERENCES&#x27; across all sql/*.sql (1 file) = 0 matches</td></tr>
+<tr class="finding-row" id="row-f19" data-cls="risk" data-dim="data-architecture" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Data Architecture · Medium</div></td><td>The Task table&#x27;s partition list has a hardcoded horizon (partitions through 2035-07 plus a pMax catch-all) with no automated partition-maintenance job anywhere in the codebase.<div class="explanation">The horizon is set a decade out deliberately (per the SQL file&#x27;s own comment) so this isn&#x27;t urgent today, but &#x27;no automation exists&#x27; is the actual finding regardless of how far off the trigger date is — once new rows start landing in pMax, partition pruning silently stops helping and nobody would notice without a monitor.</div><div class="recommendation"><b>Recommendation:</b> Build or schedule the partition-extension job now, while there&#x27;s no time pressure, rather than waiting for the pMax catch-all to start silently absorbing rows.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:23 — PARTITION BY RANGE COLUMNS(CreatedDate), 6 explicit partitions + pMax<br> — grep -ri &#x27;partition&#x27; across src/main/java — no matches; no maintenance job exists anywhere in the codebase</td></tr>
+<tr class="finding-row" id="row-f20" data-cls="risk" data-dim="data-architecture" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Data Architecture · Medium</div></td><td>CreatedDate is stored as a bare INT using an implicit YYYYMMDD encoding (the partition key), while CreatedAt stores the same underlying event as a proper DATETIME — two different representations of &#x27;when this happened&#x27; with no DB-level validation that CreatedDate is a real calendar date.<div class="explanation">MySQL&#x27;s RANGE COLUMNS partitioning supports real DATE columns, so the INT encoding looks like a legacy/manual choice rather than a technical necessity. There&#x27;s no CHECK constraint or generated-column relationship tying CreatedDate to CreatedAt, so the two could drift if application code ever sets them independently.</div><div class="recommendation"><b>Recommendation:</b> Either partition on a real DATE column, or add a generated-column/CHECK relationship (or at minimum a code-level invariant with a test) tying CreatedDate to CreatedAt so they can&#x27;t silently disagree.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:15 — CreatedDate INT NOT NULL<br>examples/sample-service/sql/001-task.sql:16 — CreatedAt DATETIME NOT NULL<br>examples/sample-service/sql/001-task.sql:24 — partition boundary literal 20350201 confirms YYYYMMDD int encoding</td></tr>
+<tr class="finding-row" id="row-f21" data-cls="risk" data-dim="data-architecture" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Data Architecture · Medium</div></td><td>The Task schema has no self-referencing or cycle-tracking column to support &#x27;recurring tasks&#x27; — the next planned feature named in the sibling docs-good/technical-vision.md&#x27;s Future Direction section (absent from docs-bad&#x27;s own empty vision doc).<div class="explanation">docs-bad names no future requirement to check the schema against (see f12), so this check has to borrow the target from the sibling docs-good doc set. Against that target: the current shape has no designed extension point for linking a completed task to its next occurrence, and the column-naming drift already found (f17) is direct historical evidence this schema tends to grow by ad hoc column-bolting rather than deliberate normalization — the same pattern would likely repeat here.</div><div class="recommendation"><b>Recommendation:</b> Design the recurring-task relationship (a parent/cycle FK or a separate TaskRecurrence table) before the feature lands, rather than adding more flat columns to Task.</div></td><td>examples/sample-service/docs-good/technical-vision.md (outside docs-bad reconciliation scope; referenced per SKILL.md&#x27;s evaluation-pass allowance since docs-bad names no future requirement of its own)<div class="muted">&#x27;Future Direction&#x27; section</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:12 — no parent/cycle/recurrence column exists on Task<br>examples/sample-service/src/main/java/com/example/tasks/entity/Task.java:14 — entity has no recurrence-related field either</td></tr>
+<tr class="finding-row" id="row-f22" data-cls="strength" data-dim="data-architecture" data-sev="info"><td><span class="badge badge-strength">Strength</span><div class="dim-tag">Data Architecture · Info</div></td><td>The Task entity has exactly one representation — normal relational columns — with no JSON-blob or otherwise schemaless shadow/variant table duplicating it.<div class="explanation">Worth crediting explicitly: there&#x27;s no analytics/query blind spot here from a parallel JSON representation, which is a real pattern the skill&#x27;s own techniques warn about elsewhere.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence"> — Only 1 DDL file (sql/001-task.sql) exists for this domain; grep -i &#x27;json&#x27; across sql/*.sql = 0 matches; no second table or blob column shadows Task</td></tr>
+<tr class="finding-row" id="row-f23" data-cls="risk" data-dim="scalability" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Scalability · Medium</div></td><td>mp.messaging.incoming.task-events.concurrency is hardcoded to 1 with no environment override, on the always-enabled task-lifecycle path.<div class="explanation">Because f10/f11 found no documented throughput target or growth horizon anywhere in docs-bad, this hardcoded value&#x27;s real risk can&#x27;t be precisely sized — it&#x27;s flagged as a concrete, verified mechanism (literal, no override, on an always-on path) rather than a speculative &#x27;might not scale.&#x27; Once a target exists this should be re-evaluated against the actual number.</div><div class="recommendation"><b>Recommendation:</b> Make concurrency env-overridable the same way `enabled` already is on the same channel, and size the default against a stated throughput target once one exists.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/src/main/resources/application.properties:5 — concurrency=1, literal, no ${ENV:...} wrapper<br>examples/sample-service/src/main/resources/application.properties:6 — contrast: enabled=${TASK_EVENTS_CONSUMER_ENABLED:true} on the same channel IS overridable</td></tr>
+<tr class="finding-row" id="row-f24" data-cls="risk" data-dim="scalability" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Scalability · Medium</div></td><td>task.cleanup.worker-count is hardcoded to 1 in application.properties with no environment override, unlike notification.batch-size in the same file which is env-overridable.<div class="explanation">Same calibration caveat as f23: no documented throughput/growth target exists in docs-bad to size this against, so severity reflects the mechanism (hardcoded, redeploy-required to change) rather than a confident &#x27;this will fail at X load.&#x27; Scaling this job&#x27;s throughput today requires a code change and redeploy, not a config change.</div><div class="recommendation"><b>Recommendation:</b> Externalize via ${ENV:1} to match the pattern already used elsewhere in the same file, and size against a stated retention/throughput target once documented.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/src/main/resources/application.properties:15 — task.cleanup.worker-count=1, literal<br>examples/sample-service/src/main/resources/application.properties:18 — contrast: notification.batch-size=${NOTIFICATION_BATCH_SIZE:50} IS overridable</td></tr>
+<tr class="finding-row" id="row-f25" data-cls="risk" data-dim="performance-cost" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Performance / Cost · Medium</div></td><td>POST /api/v1/tasks/bulk-import accepts an unbounded List&lt;Task&gt; with no size cap, batching, or rate limit.<div class="explanation">This is a structurally similar situation to notification.batch-size&#x27;s guardrail pattern, just not applied here — the inconsistency between two conceptually similar &#x27;how much do we accept in one shot&#x27; decisions is a stronger finding than a bare &#x27;there&#x27;s no cap&#x27; would be on its own.</div><div class="recommendation"><b>Recommendation:</b> Add a configurable max-batch-size guard mirroring notification.batch-size&#x27;s pattern, and reject or chunk oversized bulk-import payloads.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java:34 — bulkImport(List&lt;Task&gt; tasks) — no size validation<br>examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java:24 — tasks.forEach(taskRepository::save) — no chunking<br>examples/sample-service/src/main/resources/application.properties:18 — contrast: notification.batch-size shows the team already knows how to add a configurable cap elsewhere in this same file</td></tr>
+<tr class="finding-row" id="row-f26" data-cls="strength" data-dim="performance-cost" data-sev="info"><td><span class="badge badge-strength">Strength</span><div class="dim-tag">Performance / Cost · Info</div></td><td>TaskCleanupJob&#x27;s archival sweep benefits from the table&#x27;s CreatedDate partitioning, letting it touch only old partitions instead of scanning the whole Task table.<div class="explanation">Worth crediting: the partition key was chosen to line up with exactly the access pattern the one expensive recurring job needs, which is the sound reason to partition on CreatedDate in the first place.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/sql/001-task.sql:23 — PARTITION BY RANGE COLUMNS(CreatedDate)<br>examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java:18 — archives tasks older than the retention window</td></tr>
+<tr class="finding-row" id="row-f27" data-cls="risk" data-dim="extensibility" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Extensibility · Medium</div></td><td>docs-bad has no &#x27;how to add a new consumer/endpoint&#x27; pattern doc at all, unlike the sibling docs-good/patterns/add-a-consumer.md.<div class="explanation">A contributor working only from docs-bad has no written standard for extending the system&#x27;s core extension point (message consumers) — the pattern in code is fine (see f28), it&#x27;s just not documented in this scope.</div><div class="recommendation"><b>Recommendation:</b> Port an &#x27;add a new consumer&#x27; pattern doc into whatever becomes the maintained doc set; the underlying steps are already consistent in code, they just aren&#x27;t written down here.</div></td><td>no explicit doc claim — evaluated directly against code and doc structure<div class="muted">n/a</div></td><td class="evidence"> — find examples/sample-service/docs-bad -type f: only architecture.md, boundaries.md, data-model.md, technical-vision.md — no patterns/ subfolder<br>examples/sample-service/docs-good/patterns/add-a-consumer.md:1 — sibling doc set has this pattern doc; docs-bad does not</td></tr>
+<tr class="finding-row" id="row-f28" data-cls="strength" data-dim="extensibility" data-sev="info"><td><span class="badge badge-strength">Strength</span><div class="dim-tag">Extensibility · Info</div></td><td>Adding a new message consumer costs exactly two touchpoints — an application.properties channel block and a new @ApplicationScoped/@Incoming class — verified consistent across both existing consumers.<div class="explanation">Both real consumers follow an identical, low-cost shape. f13 found no documented speed bar to check this against, but the raw cost is low and consistent as measured directly — worth preserving as new channels are added.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java:11 — @ApplicationScoped + @Incoming shape<br>examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java:12 — structurally identical shape</td></tr>
+<tr class="finding-row" id="row-f29" data-cls="risk" data-dim="observability" data-sev="high"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Observability · High</div></td><td>None of the three highest-impact logic paths (TaskEventConsumer, TaskReminderConsumer, TaskCleanupJob&#x27;s archival sweep) have any traffic, error, latency, or saturation instrumentation.<div class="explanation">All four golden signals are checked separately per SKILL.md 7(a) and all four are absent for all three paths — not even a log statement exists anywhere in the codebase.</div><div class="recommendation"><b>Recommendation:</b> Before this pattern reaches a real service, add at minimum a traffic counter and error counter on each consumer, and a duration timer on the cleanup job&#x27;s sweep.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence"> — grep -rniE &#x27;metric|counter|timer|gauge|micrometer|prometheus|histogram|log\.|Logger&#x27; across src/main/java — 0 matches<br>examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java:15 — onTaskEvent body is a comment only, no instrumentation<br>examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java:17 — archiveOldTasks body is a comment only, no instrumentation</td></tr>
+<tr class="finding-row" id="row-f30" data-cls="risk" data-dim="observability" data-sev="high"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Observability · High</div></td><td>The task-events/task-reminders drop-on-failure behavior has no metric — or even a log line — tracking how many messages are actually dropped.<div class="explanation">Per SKILL.md 7(b), this is the highest-value observability check: the safety net (best-effort/drop-on-failure) has no metric on its own outcome, so the real drop rate is completely unknown to anyone operating the system.</div><div class="recommendation"><b>Recommendation:</b> Add a drop counter (or better, a gauge tracking outstanding/unrecovered drops) on both consumers&#x27; failure path — this is the single highest-value observability gap found in this service.</div></td><td>no explicit doc claim — evaluated directly against code<div class="muted">n/a</div></td><td class="evidence">examples/sample-service/src/main/resources/application.properties:4 — failure-strategy=ignore on task-events<br>examples/sample-service/src/main/resources/application.properties:11 — failure-strategy=ignore on task-reminders too<br> — cross-reference: docs-good/technical-vision.md&#x27;s Design Philosophy section independently admits &#x27;there is currently no metric confirming the actual drop rate, which is itself tracked as a gap&#x27; — code confirms this directly, both consumer method bodies have no counter or log call</td></tr>
+<tr class="finding-row" id="row-f31" data-cls="risk" data-dim="maintainability" data-sev="low"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Maintainability · Low</div></td><td>Every package in the codebase has exactly one distinct commit author in the last 180 days; the churn script&#x27;s bus_factor_hotspots/high_diversity_hotspots lists came back empty because commit volume is too low to cross the script&#x27;s thresholds, not because concentration is actually distributed.<div class="explanation">This is a legitimate low-priority finding, not an alarm: per SKILL.md 8(a), bus-factor risk on routine CRUD is low-priority, and this codebase is exactly that (simple stubs, no disabled-by-default complexity). Flagging it because the hotspot script&#x27;s absolute-volume threshold means genuine single-author concentration can exist without ever surfacing in bus_factor_hotspots — worth a manual check going forward as the codebase grows past fixture size.</div><div class="recommendation"><b>Recommendation:</b> No action needed today given the code&#x27;s low complexity; revisit bus-factor exposure once churn/complexity grow past what this small fixture represents.</div></td><td>no explicit doc claim — evaluated directly against churn data<div class="muted">n/a</div></td><td class="evidence">churn.json — package_authors: every package (consumer, entity, repository, resource, scheduler, service) shows distinct_authors=1<br> — sanity check: git log --since=&#x27;180 days ago&#x27; --no-merges --pretty=format:%an -- examples/sample-service/src | sort | uniq -c =&gt; &#x27;1 Sumeet Sharma&#x27; — confirms single-author, no merge-commit skew</td></tr>
+<tr class="finding-row" id="row-f32" data-cls="risk" data-dim="maintainability" data-sev="medium"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Maintainability · Medium</div></td><td>Because docs-bad has no pattern doc for adding a consumer, any future drift from the two existing consumers&#x27; shared shape would only be caught by ad hoc code review, not a documented standard.<div class="explanation">Per SKILL.md 8(b): this is a distinct finding from f27 (existence of the inconsistency) — the cost is that a fix or a shape change to &#x27;how consumers work&#x27; now has to be re-verified by hand for every future consumer, instead of being checked against one written doc.</div><div class="recommendation"><b>Recommendation:</b> Same fix as f27 — writing the pattern doc down converts an ad hoc review burden into a checklist that scales with the number of consumers added.</div></td><td>no explicit doc claim — evaluated directly against code and doc structure<div class="muted">n/a</div></td><td class="evidence"> — same absence as f27 (no docs-bad/patterns/ folder); distinct angle here is the compounding future cost, not the existence of the gap itself</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<script>
+  const state = { cls: 'all', dim: 'all' };
+  const rows = document.querySelectorAll('.finding-row');
+
+  function applyFilters() {
+    rows.forEach(r => {
+      const clsOk = state.cls === 'all' || r.dataset.cls === state.cls;
+      const dimOk = state.dim === 'all' || r.dataset.dim === state.dim;
+      r.classList.toggle('hidden', !(clsOk && dimOk));
+    });
+  }
+
+  document.querySelectorAll('.filters button').forEach(btn => btn.addEventListener('click', () => {
+    const group = btn.dataset.filterGroup;
+    document.querySelectorAll(`.filters button[data-filter-group="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state[group] = btn.dataset.filter;
+    applyFilters();
+  }));
+
+  document.querySelectorAll('.key-finding-link').forEach(link => link.addEventListener('click', (ev) => {
+    const targetId = link.getAttribute('href').slice(1);
+    const row = document.getElementById(targetId);
+    if (!row) return;
+    ev.preventDefault();
+    document.querySelectorAll('.filters button[data-filter-group="cls"]')[0].click();
+    document.querySelectorAll('.filters button[data-filter-group="dim"]')[0].click();
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('flash');
+    setTimeout(() => row.classList.remove('flash'), 2000);
+  }));
+</script>
+</body>
+</html>

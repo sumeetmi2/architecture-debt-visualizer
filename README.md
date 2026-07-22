@@ -162,6 +162,39 @@ same repo was independently rediscovered by cold agents that never saw that refe
 findings — including cases where two agents, given the identical prompt and scope, arrived at the
 same conclusion via different evidence.
 
+### Public, reproducible test: `examples/sample-service`
+
+The reliability numbers above come from a private repo whose specifics can't be shared. This repo
+also ships a small, purpose-built fixture — [`examples/sample-service`](examples/sample-service) —
+so the same kind of test is fully reproducible by anyone, with real, non-obfuscated reports you can
+open and check. See [its own README](examples/sample-service/README.md) for what's in it: a ~10-file
+Java service with deliberately planted architecture debt, documented against two doc sets
+(`docs-bad`, stale/incomplete; `docs-good`, accurate and complete) that share identical code.
+
+Three independent cold runs against `docs-bad` (fresh agent, no memory of prior runs, no memory of
+each other, no knowledge of what was deliberately planted):
+
+| Run | Score | Findings | data-architecture evaluation findings (cap 7) |
+|---|---|---|---|
+| [1 — human-reviewed, benchmark](examples/sample-service/reports/docs-bad-run1-benchmark.html) | 30/100 | 32 | 7/7 |
+| [2](examples/sample-service/reports/docs-bad-run2.html) | 32/100 | 32 | 7/7 |
+| [3](examples/sample-service/reports/docs-bad-run3.html) | 25/100 | 33 | 6/7 |
+
+7-point score spread, 1-finding spread. All three independently caught every deliberately-planted
+issue (the entity/DDL primary-key mismatch, the undocumented endpoint, the undocumented consumer,
+the empty vision doc) plus real issues nobody planted — run 3, for instance, caught that the
+table's partition key (`CreatedDate`) doesn't actually match the column the archival job filters on
+(`CompletedAt`), a genuine mismatch that fell out of the investigation rather than being seeded.
+Run 1 was manually reviewed before being treated as the benchmark for runs 2 and 3.
+
+**Known limitation, disclosed rather than hidden:** a phrasing rule exists (state findings as direct
+facts, not as an unresolved positive-sounding hypothesis with no marker — see `SKILL.md`) specifically
+because early testing showed the wrong phrasing reads as a false "this is fine" on a skim. It's
+followed reliably when a run is explicitly told to self-audit before finalizing, but recurs in some
+ordinary cold runs (visible in a few rows across the reports linked above) because the instruction
+currently isn't self-enforcing. Content and evidence are unaffected — only the wording of some claim
+sentences reads more ambiguously than intended. Tracked as follow-up work, not swept under the rug.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
