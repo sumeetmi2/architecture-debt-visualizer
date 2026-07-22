@@ -1,0 +1,91 @@
+{
+  "prefix": "com.example.tasks",
+  "nodes": [
+    {
+      "id": "com.example.tasks.consumer",
+      "class_count": 2
+    },
+    {
+      "id": "com.example.tasks.entity",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.tasks.repository",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.tasks.resource",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.tasks.scheduler",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.tasks.service",
+      "class_count": 1
+    }
+  ],
+  "edges": [
+    {
+      "from": "com.example.tasks.repository",
+      "to": "com.example.tasks.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/sample-service/src/main/java/com/example/tasks/repository/TaskRepository.java",
+          "line": 3,
+          "imported_class": "com.example.tasks.entity.Task"
+        }
+      ]
+    },
+    {
+      "from": "com.example.tasks.resource",
+      "to": "com.example.tasks.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java",
+          "line": 3,
+          "imported_class": "com.example.tasks.entity.Task"
+        }
+      ]
+    },
+    {
+      "from": "com.example.tasks.resource",
+      "to": "com.example.tasks.service",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java",
+          "line": 4,
+          "imported_class": "com.example.tasks.service.TaskService"
+        }
+      ]
+    },
+    {
+      "from": "com.example.tasks.service",
+      "to": "com.example.tasks.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java",
+          "line": 3,
+          "imported_class": "com.example.tasks.entity.Task"
+        }
+      ]
+    },
+    {
+      "from": "com.example.tasks.service",
+      "to": "com.example.tasks.repository",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java",
+          "line": 4,
+          "imported_class": "com.example.tasks.repository.TaskRepository"
+        }
+      ]
+    }
+  ]
+}

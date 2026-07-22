@@ -14,9 +14,9 @@
 
 ## Versioning & Deprecation Policy
 
-- **REST endpoints** are unversioned today (no `/v1/` prefix) — acceptable at current scale (a
-  handful of internal callers, tracked in `boundaries.md`), but the team has agreed to add path
-  versioning before the first external/partner consumer, not after.
+- **REST endpoints** already carry a `/api/v1/` prefix (see `boundaries.md`), adopted early even
+  though every current caller is internal — the team would rather eat the small early cost than
+  retrofit versioning once an external/partner consumer exists.
 - **Message channels**: a channel is never repurposed once it has a consumer — a semantic change
   ships as a new channel name instead, and the old one is drained and removed after confirming zero
   producers/consumers reference it (checked via the same reconciliation this skill performs).

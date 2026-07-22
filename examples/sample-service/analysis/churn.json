@@ -1,0 +1,95 @@
+{
+  "since": "180 days ago",
+  "files": {
+    "examples/sample-service/docs-good/technical-vision.md": 3,
+    "examples/sample-service/README.md": 2,
+    "examples/sample-service/sql/001-task.sql": 2,
+    "examples/sample-service/reports/docs-bad-run3.html": 1,
+    "examples/sample-service/reports/docs-bad-run2.html": 1,
+    "examples/sample-service/reports/docs-bad-run1-benchmark.html": 1,
+    "examples/sample-service/docs-bad/technical-vision.md": 1,
+    "examples/sample-service/docs-good/architecture.md": 1,
+    "examples/sample-service/docs-bad/data-model.md": 1,
+    "examples/sample-service/build.gradle": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/repository/TaskRepository.java": 1,
+    "examples/sample-service/docs-bad/architecture.md": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java": 1,
+    "examples/sample-service/src/main/resources/application.properties": 1,
+    "examples/sample-service/settings.gradle": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java": 1,
+    "examples/sample-service/docs-good/data-model.md": 1,
+    "examples/sample-service/docs-good/patterns/add-a-consumer.md": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java": 1,
+    "examples/sample-service/docs-bad/boundaries.md": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java": 1,
+    "examples/sample-service/src/main/java/com/example/tasks/entity/Task.java": 1,
+    "examples/sample-service/docs-good/boundaries.md": 1
+  },
+  "packages": {
+    "com.example.tasks.consumer": 2,
+    "com.example.tasks.repository": 1,
+    "com.example.tasks.scheduler": 1,
+    "com.example.tasks.resource": 1,
+    "com.example.tasks.service": 1,
+    "com.example.tasks.entity": 1
+  },
+  "package_authors": {
+    "com.example.tasks.repository": {
+      "distinct_authors": 1,
+      "top_authors": [
+        [
+          "Sumeet Sharma",
+          1
+        ]
+      ]
+    },
+    "com.example.tasks.scheduler": {
+      "distinct_authors": 1,
+      "top_authors": [
+        [
+          "Sumeet Sharma",
+          1
+        ]
+      ]
+    },
+    "com.example.tasks.resource": {
+      "distinct_authors": 1,
+      "top_authors": [
+        [
+          "Sumeet Sharma",
+          1
+        ]
+      ]
+    },
+    "com.example.tasks.service": {
+      "distinct_authors": 1,
+      "top_authors": [
+        [
+          "Sumeet Sharma",
+          1
+        ]
+      ]
+    },
+    "com.example.tasks.consumer": {
+      "distinct_authors": 1,
+      "top_authors": [
+        [
+          "Sumeet Sharma",
+          2
+        ]
+      ]
+    },
+    "com.example.tasks.entity": {
+      "distinct_authors": 1,
+      "top_authors": [
+        [
+          "Sumeet Sharma",
+          1
+        ]
+      ]
+    }
+  },
+  "bus_factor_hotspots": [],
+  "high_diversity_hotspots": []
+}

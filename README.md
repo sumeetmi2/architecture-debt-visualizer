@@ -203,6 +203,13 @@ table's partition key (`CreatedDate`) doesn't actually match the column the arch
 (`CompletedAt`), a genuine mismatch that fell out of the investigation rather than being seeded.
 Run 1 was manually reviewed before being treated as the benchmark for runs 2 and 3.
 
+A separate cold run against the accurately-documented `docs-good` scope (same code, better docs) —
+[report](examples/sample-service/reports/docs-good-run1.html) — scored 41/100 with 45 findings (15
+confirmed, 1 misaligned, 1 gap, 20 risk, 8 strength): mostly `confirmed` reconciliation as expected,
+plus the same evaluation-pass risks the `docs-bad` runs found, since those are judged from the code
+directly. It also caught a real, unplanted mistake in the "good" docs themselves — see
+[`examples/sample-service/README.md`](examples/sample-service/README.md#docs-good-run) for details.
+
 **Known limitation, disclosed rather than hidden:** a phrasing rule exists (state findings as direct
 facts, not as an unresolved positive-sounding hypothesis with no marker — see `SKILL.md`) specifically
 because early testing showed the wrong phrasing reads as a false "this is fine" on a skim. It's
