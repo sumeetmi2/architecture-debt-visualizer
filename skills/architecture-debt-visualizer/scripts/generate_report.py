@@ -443,10 +443,23 @@ def build_findings_table(findings):
         )
         recommendation = s(f, "recommendation")
         rec_html = f'<div class="recommendation"><b>Recommendation:</b> {html.escape(recommendation)}</div>' if recommendation else ""
+
+        meta_bits = []
+        finding_type = s(f, "finding_type")
+        if finding_type:
+            meta_bits.append(f'<span class="meta-tag">{html.escape(finding_type)}</span>')
+        for area in (f.get("impact_area") or []):
+            meta_bits.append(f'<span class="meta-tag meta-tag-impact">{html.escape(area)}</span>')
+        confidence = s(f, "confidence")
+        if confidence:
+            meta_bits.append(f'<span class="meta-tag meta-tag-confidence">confidence: {html.escape(confidence)}</span>')
+        meta_html = f'<div class="meta-tags">{"".join(meta_bits)}</div>' if meta_bits else ""
+
         rows.append(
             f'<tr class="finding-row" id="row-{html.escape(f["id"])}" data-cls="{cls}" data-dim="{dim}" data-sev="{severity}">'
             f'<td><span class="badge badge-{cls}">{CLASS_LABEL.get(cls, cls)}</span>'
-            f'<div class="dim-tag">{DIMENSION_LABEL.get(dim, dim)} · {SEVERITY_LABEL.get(severity, severity)}</div></td>'
+            f'<div class="dim-tag">{DIMENSION_LABEL.get(dim, dim)} · {SEVERITY_LABEL.get(severity, severity)}</div>'
+            f'{meta_html}</td>'
             f'<td>{html.escape(s(f, "claim"))}'
             f'<div class="explanation">{html.escape(s(f, "explanation"))}</div>'
             f'{rec_html}</td>'
@@ -526,6 +539,11 @@ TEMPLATE = """<!doctype html>
   .badge-sev-medium {{ background: #78350f; color: #fde68a; }}
   .badge-sev-low {{ background: #1e293b; color: #94a3b8; }}
   .dim-tag {{ color: #64748b; font-size: 10.5px; margin-top: 4px; }}
+  .meta-tags {{ margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }}
+  .meta-tag {{ background: #1e293b; color: #94a3b8; border-radius: 4px; padding: 1px 6px;
+               font-size: 10px; white-space: nowrap; }}
+  .meta-tag-impact {{ color: #a5b4fc; }}
+  .meta-tag-confidence {{ color: #86efac; }}
   .explanation {{ color: #94a3b8; font-size: 12px; margin-top: 4px; }}
   .recommendation {{ color: #d8b4fe; font-size: 12px; margin-top: 6px; }}
   .muted {{ color: #64748b; font-size: 11px; }}

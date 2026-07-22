@@ -1,0 +1,35 @@
+{
+  "_purpose": "Golden test specs for run_evals.py. This is a grading harness, not an LLM-invoking one — it scores an already-generated findings.json/checks.json (produced by an actual skill run, cold or otherwise) against must_find/must_not_find/expected_not_applicable expectations. JSON, not YAML, to keep this repo's zero-third-party-dependency policy (PyYAML isn't available/installed by default and every other script here is pure stdlib).",
+  "cases": [
+    {
+      "id": "sample-service-docs-bad-must-find",
+      "description": "Every deliberately planted issue in examples/sample-service (docs-bad scenario) must survive as a finding. Source of truth for this list: examples/sample-service/README.md's planted-issues table.",
+      "must_find": [
+        {"match": "bulk", "classification": "gap", "note": "undocumented bulk-import REST endpoint"},
+        {"match": "task-reminders", "classification": "gap", "note": "undocumented TaskReminderConsumer"},
+        {"match": "composite", "dimension": "data-architecture", "note": "JPA @Id vs composite DDL key mismatch"},
+        {"match": "casing|PascalCase|camelCase", "dimension": "data-architecture", "note": "column-naming convention drift"},
+        {"match": "partition", "note": "partition list has a hardcoded horizon with no maintenance job"},
+        {"match": "concurrency|worker-count", "dimension": "scalability", "note": "hardcoded, non-overridable capacity number"},
+        {"match": "vision", "dimension": "vision-alignment", "note": "empty/scaffolding vision doc"},
+        {"match": "throughput|QPS|scale target", "dimension": "scale-requirements", "note": "no stated scale target"},
+        {"match": "channel|extensibility", "dimension": "extensibility-requirements", "note": "no stated future-channel timeline"}
+      ],
+      "allowed_optional": [
+        {"match": "CompletedAt", "note": "the unplanted partition-key-vs-archival-filter mismatch one prior run found independently — nice if present, not required"}
+      ]
+    },
+    {
+      "id": "minimal-cli-tool-must-not-find",
+      "description": "system-context classification (cli-tool) must suppress false-positive risk findings for a system type that legitimately has no throughput/observability surface. This is the golden case for the check-coverage model's not-applicable path — see examples/minimal-cli-tool.expected.md.",
+      "must_not_find": [
+        {"match": "throughput|QPS|scale target", "classification": "risk", "dimension": "scale-requirements", "note": "missing scale target must NOT be a risk for a cli-tool"},
+        {"match": "golden signal|metric|observability", "classification": "risk", "dimension": "observability", "note": "missing observability must NOT be a risk for a cli-tool"}
+      ],
+      "expected_not_applicable": [
+        "scale-requirements.a", "scale-requirements.b",
+        "observability.a", "observability.b"
+      ]
+    }
+  ]
+}
