@@ -60,10 +60,25 @@ One entry per mandatory (and optionally, non-mandatory) check from `scripts/rubr
 
 - `id` — must match an id in `scripts/rubric_manifest.json`.
 - `status` — `risk` / `strength` / `clean` / `not-applicable` / `not-assessed`.
+- `scope` — free-text array naming what the check was actually run against: a class/file name for
+  a code-scoped check (`"OrderEventConsumer"`), a doc path for a doc-scoped check
+  (`"docs/technical-vision.md"`), or a component/deployment-unit label when neither applies
+  (`"serverless-handler"`). Not the same namespace as `findings.json`'s `packages` field (which is
+  specifically dotted package IDs matching `dep_graph.json` node names) — `scope` is looser and
+  exists for human readability in the report, not for cross-referencing against the dep graph.
 - `finding_id` — required when `status` is `risk` or `strength`; must match a `findings.json`
   entry's `id`.
 - `evidence` — required when `status` is `clean` (what you looked at to conclude "nothing here").
 - `reason` — required when `status` is `not-applicable` or `not-assessed`.
+
+**`not-applicable` vs. `clean` — the line is whether the underlying concept exists in this repo at
+all, not whether the result was good.** `clean` means the thing the check is about *exists* here
+and you looked at it and found no issue — e.g. `data-architecture.e` (type choices) is `clean` on a
+repo that has monetary fields and uses the correct decimal type for them. `not-applicable` means
+the thing the check is about *doesn't exist* here to check in the first place — the same
+`data-architecture.e` is `not-applicable` on a repo with no monetary/quantity fields anywhere, since
+there's no type-choice decision to have gotten right or wrong. Don't force `clean` onto a check that
+had nothing to actually examine.
 
 ## `findings.json`
 

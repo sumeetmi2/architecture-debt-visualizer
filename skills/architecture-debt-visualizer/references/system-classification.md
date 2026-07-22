@@ -33,6 +33,16 @@ Write `context.json` in the run directory:
   a scheduled job with no HTTP surface → `batch-job`; explicit `WIP`/`experimental`/`spike`
   language in the README or a very recent, thin commit history → `prototype`; a repo whose README
   or last commits say it's deprecated/frozen/superseded → `archived`.
+
+  **Illustrative/non-buildable teaching fixtures still classify by architectural shape, not by
+  disclaimer.** A repo whose build config says "illustrative only, not buildable, nothing to
+  compile or run here" but whose code has real entry points (REST resources, message consumers, a
+  cron job) is still shaped like a `production-service` — classify it that way (with `confidence:
+  low` if the tension is worth flagging), don't invent a "fixture"/"example" bucket. The taxonomy
+  exists to size the blast radius of the *architecture*, and a teaching fixture built to demonstrate
+  production-shaped debt has exactly that shape regardless of whether it's ever actually deployed —
+  a "just a fixture" carve-out would also let real, deployable code dodge scrutiny by claiming the
+  same disclaimer.
 - `criticality` — free text, e.g. `financially-critical`, `internal-tooling`, `customer-facing`,
   `low-stakes`. Informational, not used for applicability gating today.
 - `lifecycle` — `active`, `maintenance`, or `archived` (redundant with `system_type: archived` in

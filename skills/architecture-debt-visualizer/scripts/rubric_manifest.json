@@ -70,7 +70,7 @@
     }
   },
   "system_type_overrides": {
-    "_note": "Sparse overrides only. Any (system_type, dimension) pair not listed here defaults to 'mandatory' — including every dimension for production-service, and every dimension for any system_type not listed below at all (e.g. an unclassified or low-confidence repo). This is deliberate: uncertainty about what a repo is defaults to the strictest tier, not the most lenient one.",
+    "_note": "Sparse overrides only. Any (system_type, dimension) pair not listed here defaults to 'mandatory' — including every dimension for production-service, and every dimension for any system_type not listed below at all (e.g. an unclassified or low-confidence repo). This is deliberate: uncertainty about what a repo is defaults to the strictest tier, not the most lenient one. production-service's entry below is deliberately present as an empty object {} rather than omitted — it means the same thing as 'key absent' (everything mandatory), spelled out explicitly for the single most common case so a reader doesn't have to infer it from absence. batch-job's {} means the same thing, for the same reason.",
     "production-service": {},
     "library": {
       "scale-requirements": "informational",

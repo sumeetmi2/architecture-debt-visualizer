@@ -122,7 +122,11 @@ coverage record** in `checks.json`, with a status of `risk`, `strength`, `clean`
 - `not-applicable` — the check doesn't apply to this repo's shape (e.g. `data-architecture.g`,
   shadow representations, on a repo with no database at all) or the dimension is `informational`
   for this `system_type` and the underlying condition (e.g. no stated scale target) isn't being
-  penalized. Say why.
+  penalized. Say why. **A consistency-style check that needs at least two instances to compare**
+  (`extensibility.b`, `maintainability.b` — "is X modeled the same way everywhere") is legitimately
+  `not-applicable`, not `clean`, when the repo has zero or one instance of the thing being compared
+  — there's nothing to be consistent *or* inconsistent with yet. Don't force a `clean` verdict onto
+  a check that had nothing to actually check.
 - `not-assessed` — you didn't get to it. This is a legitimate status to ship with, but it should be
   rare and should show up in your chat summary (step 8) as an explicit limitation, not buried.
 
@@ -132,6 +136,15 @@ has more real issues than another. A dimension can produce 0 risk findings and 7
 that's a fully reproducible, fully covered, genuinely clean result, not evidence the pass was
 rushed.
 
+**When one check's prerequisite is itself absent, downstream checks resolve `not-applicable` citing
+the upstream absence — they don't restate the same risk a second time.** Several checks are chained
+by design (`vision-alignment.b` needs `vision-alignment.a`'s vision content to exist before it can
+compare decisions against it; `data-architecture.f`'s forward-readiness check needs the same vision
+content to know what's coming). When the prerequisite check already recorded the absence as a
+`risk`, mark the dependent check `not-applicable` with a reason like *"no vision doc content exists
+to compare against — see vision-alignment.a"* rather than either leaving it `not-assessed` or
+logging a second, redundant risk finding about the same missing doc.
+
 **Every lettered check is individually mandatory — not a menu to pick from, and not interchangeable
 with another check in the same dimension.** A measured failure mode from the old rubric: two
 parallel runs each produced their required finding count for `data-architecture`, but one run spent
@@ -139,6 +152,21 @@ its budget on money-type precision *twice* and never ran the naming-convention c
 the other caught it. Coverage records fix this directly: `data-architecture.b` (naming/
 normalization) and `data-architecture.e` (type choices) are different check IDs and both need their
 own record, regardless of how many risks either one turns up.
+
+**Every check that resolves `risk` or `strength` gets its own `findings.json` entry — never share
+one `finding_id` across two checks, even when the same evidence or the same doc paragraph feeds
+both.** A measured failure mode from the *new* check-coverage model's first validation run: one run
+noticed `scale-requirements.a` and `scale-requirements.b` were both answered by the same vision-doc
+paragraph, and wrote one combined finding referenced by both checks' coverage records — 13
+findings, fully covered on paper. A second, independent run wrote a separate finding per check —
+22 findings, also fully covered on paper. Both technically satisfied "every mandatory check has a
+coverage record," but the finding *count* swung by nearly 2x anyway, which defeats the whole point
+of replacing the old min/max-count rubric with a coverage model in the first place: coverage was
+supposed to make finding count an *output*, not something still subject to a judgment call. The
+fix: shared evidence is fine and expected (the same file/line can support multiple findings); a
+shared `finding_id` is not. If two checks are answered by the same underlying fact, write two
+findings that both cite it, each with its own id, each linked from its own check record — never
+merge them into one.
 
 ## Dimension checklists
 
@@ -154,7 +182,12 @@ keep in sync by hand.
 Performance/cost checks later.
 
 **Extensibility requirements** (also do this first — calibrates Extensibility below):
-(a) search docs for named future tenants/integrations/use cases and any stated timeline;
+(a) search docs for named future tenants/integrations/use cases and any stated timeline. This is a
+compound check — **named-but-no-timeline is a distinct, lower-severity outcome from both "fully
+stated" and "nothing named at all," not a forced binary.** If the docs name concrete candidates
+with no timeline, record it as a `risk` at `low` (not `medium`+) severity noting specifically what's
+missing (the timeline, not the whole requirement) — don't score it as either a full pass or as
+equivalent to a `high`-severity total absence;
 (b) search for a stated bar on how fast/cheaply a new instance of the system's core extension point
 must be addable — if found, carry it into the Extensibility check and judge actual cost against it.
 

@@ -110,7 +110,10 @@ citing `file:line` evidence.
 
 **If the underlying code hasn't changed since a prior run against this same repo** (e.g. testing
 two doc-quality scenarios against identical code, as in `examples/sample-service`), these two
-files can be reused instead of regenerated — both are code/git-derived only, not doc-derived.
+files can be reused instead of regenerated — both are code/git-derived only, not doc-derived. When
+a repo keeps its own persisted copies (e.g. `examples/sample-service/analysis/*.json`), it's fine
+to point `generate_report.py`'s `--dep-graph`/`--churn` flags straight at those paths — they don't
+need to be copied into `$RUN_DIR` first.
 
 ## 4. Reconciliation pass (`reconcile`/`full`)
 
