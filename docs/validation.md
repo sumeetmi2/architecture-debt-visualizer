@@ -168,11 +168,26 @@ item — a real schema change, not yet built.
 
 **Reliability/resilience, change-safety, and security-boundaries dimensions** were added after the
 same review (12 dimensions total now, up from 9) with 5 lettered checks each, following the exact
-manifest/applicability-override pattern the original 9 already used. **Not yet cold-run validated**
-the way the check-coverage model itself was — added directly given the pattern was already proven
-3 times in this project, but no fresh cold-agent run has confirmed these specific new checks
-produce sensible, reproducible output yet. Treat these three dimensions as less battle-tested than
-the original 9 until that validation happens.
+manifest/applicability-override pattern the original 9 already used.
+
+First cold run: [`examples/sample-service/reports/docs-good-run3-newdims.html`](../examples/sample-service/reports/docs-good-run3-newdims.html)
+— 40 findings (11 confirmed, 1 gap, 20 risk, 8 strength), 37/37 checks covered (100%, up from 22),
+`validate_findings.py` passed clean on the first attempt. The 16 new-dimension findings were all
+concrete and evidence-backed (no idempotency-key mechanism on the write endpoints, no timeout/
+circuit-breaker config anywhere, zero authN/authZ on any REST endpoint, a credited strength for the
+`/api/v1/` versioning + documented deprecation policy). The run surfaced four real checklist-wording
+gaps, since fixed directly in `references/evaluation-rubric.md`:
+- `reliability-resilience.d` didn't say what to do when no multi-step write path exists at all
+  (now explicit: `not-applicable`, distinct from "exists but couldn't verify").
+- `change-safety.b`'s framing implied catching a breaking change "in the act"; a young repo with
+  too little history to show either pattern is still a real finding (absence of established
+  convention), just a different claim — now stated explicitly.
+- `security-boundaries.a` read as only asking about inconsistency between endpoints; uniform
+  absence of auth across all endpoints is an equally real, often more severe finding under the
+  same letter — now stated explicitly.
+- Stubbed/illustrative persistence code (this fixture's repository layer) can only be assessed at
+  the API-contract level for `reliability-resilience.a`/`security-boundaries.d`, not observed
+  runtime behavior — now noted as a legitimate, narrower way to answer those checks.
 
 **Eval harness scope:** `evals/run_evals.py` grades already-generated output; it doesn't invoke the
 skill itself, so it validates the grader and catches regressions in already-produced findings, but

@@ -1,0 +1,806 @@
+{
+  "title": "Architecture Debt Report — sample-service (docs-good, full mode, 12-dimension rubric)",
+  "doc_sources": [
+    "examples/sample-service/docs-good/architecture.md",
+    "examples/sample-service/docs-good/boundaries.md",
+    "examples/sample-service/docs-good/data-model.md",
+    "examples/sample-service/docs-good/technical-vision.md",
+    "examples/sample-service/docs-good/patterns/add-a-consumer.md"
+  ],
+  "findings": [
+    {
+      "id": "f1",
+      "claim": "architecture.md's Key Components table lists TaskResource, TaskEventConsumer, TaskReminderConsumer, and TaskCleanupJob as the service's key components.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Key Components table, lines 17-24",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.resource", "com.example.tasks.consumer", "com.example.tasks.scheduler"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 11, "note": "public class TaskResource"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java", "line": 12, "note": "public class TaskEventConsumer"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java", "line": 13, "note": "public class TaskReminderConsumer"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java", "line": 14, "note": "public class TaskCleanupJob"}
+      ],
+      "explanation": "All four classes named in the component table exist with the described responsibilities.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f2",
+      "claim": "architecture.md's Data Flow item 1: create/fetch are synchronous REST calls against TaskResource, backed by TaskRepository.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Data Flow, item 1, line 28",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.resource", "com.example.tasks.service", "com.example.tasks.repository"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 18, "note": "synchronous create()"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 25, "note": "synchronous get()"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java", "line": 16, "note": "delegates to taskRepository.save()"}
+      ],
+      "explanation": "Both create and fetch are plain synchronous JAX-RS methods routed through TaskService to TaskRepository, matching the doc's claim.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f3",
+      "claim": "architecture.md's Data Flow item 2: task-events messages update task state asynchronously; failures are dropped (failure-strategy=ignore), not retried.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Data Flow, item 2, lines 29-31",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 4, "note": "mp.messaging.incoming.task-events.failure-strategy=ignore"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java", "line": 14, "note": "@Incoming(\"task-events\")"}
+      ],
+      "explanation": "Config directly matches the doc's claim.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f4",
+      "claim": "architecture.md's Data Flow item 3: task-reminders messages trigger reminder notifications, same drop-on-failure behavior as the events channel.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Data Flow, item 3, lines 32-33",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 11, "note": "mp.messaging.incoming.task-reminders.failure-strategy=ignore"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java", "line": 15, "note": "@Incoming(\"task-reminders\")"}
+      ],
+      "explanation": "Config directly matches the doc's claim.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f5",
+      "claim": "architecture.md's Data Flow item 4: TaskCleanupJob runs hourly and moves old completed tasks into partitioned storage.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Data Flow, item 4, lines 34-35",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.scheduler"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java", "line": 16, "note": "@Scheduled(every = \"1h\")"}
+      ],
+      "explanation": "Hourly schedule matches; the archival logic itself is a stub, which is a separate matter (see reliability-resilience.d).",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": ["archiveOldTasks()'s body is an unimplemented comment-only stub, so only the schedule (not the archival behavior itself) is directly confirmable."]
+    },
+    {
+      "id": "f6",
+      "claim": "boundaries.md's HTTP API table lists exactly three endpoints (POST /api/v1/tasks, GET /api/v1/tasks/{id}, POST /api/v1/tasks/bulk-import) and this is the complete set.",
+      "doc_source": "examples/sample-service/docs-good/boundaries.md",
+      "doc_location": "HTTP API table, lines 15-19",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.resource"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 16, "note": "POST create"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 22, "note": "GET get"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 31, "note": "POST bulk-import"}
+      ],
+      "explanation": "All three endpoints exist and match the table exactly; TaskResource.java has no fourth endpoint (verified by reading the whole class, 37 lines).",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["read TaskResource.java in full (37 lines) — exactly 3 @Path-bearing methods, no others"],
+      "limitations": []
+    },
+    {
+      "id": "f7",
+      "claim": "boundaries.md's Message Consumers table lists exactly two channels (task-events, task-reminders) and this is the complete set; both enabled by default with drop-on-failure behavior.",
+      "doc_source": "examples/sample-service/docs-good/boundaries.md",
+      "doc_location": "Message Consumers table, lines 21-26",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 6, "note": "task-events enabled=${TASK_EVENTS_CONSUMER_ENABLED:true}"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 12, "note": "task-reminders enabled=${TASK_REMINDERS_CONSUMER_ENABLED:true}"}
+      ],
+      "explanation": "Both channels are documented (unlike docs-bad, which omits task-reminders); no third @Incoming channel exists anywhere in the consumer package.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration", "negative-search"],
+      "searches_performed": ["read every file under consumer/ (2 files) — exactly 2 @Incoming-annotated methods, no others"],
+      "limitations": []
+    },
+    {
+      "id": "f8",
+      "claim": "data-model.md discloses that Task's JPA @Id is a single column (id) while the real DDL primary key is composite (CreatedDate, Id).",
+      "doc_source": "examples/sample-service/docs-good/data-model.md",
+      "doc_location": "Known limitation, lines 15-20",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.entity"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/entity/Task.java", "line": 16, "note": "@Id private String id"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 20, "note": "PRIMARY KEY (`CreatedDate`, `Id`)"}
+      ],
+      "explanation": "The doc's own disclosure matches the code exactly. See finding f20 for the independent evaluation-pass judgment on this same fact.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "schema"],
+      "limitations": []
+    },
+    {
+      "id": "f9",
+      "claim": "data-model.md discloses column-casing drift (PascalCase original columns, camelCase priority/assigneeId added later) and a hardcoded partition horizon with no automated extension job.",
+      "doc_source": "examples/sample-service/docs-good/data-model.md",
+      "doc_location": "Also known, lines 21-24",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 13, "note": "PascalCase: Id, Status, CreatedDate, CreatedAt, CompletedAt"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 18, "note": "camelCase: priority, assigneeId"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 23, "note": "partition list ends at pmax catch-all, no automation job referenced anywhere"}
+      ],
+      "explanation": "Both disclosed facts match the schema exactly.",
+      "confidence": "high",
+      "evidence_type": ["schema", "negative-search"],
+      "searches_performed": ["searched src/ for any partition-maintenance/extension job — none found"],
+      "limitations": []
+    },
+    {
+      "id": "f10",
+      "claim": "technical-vision.md's Versioning & Deprecation Policy states REST endpoints already carry a /api/v1/ prefix.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Versioning & Deprecation Policy, lines 17-19",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.resource"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 10, "note": "@Path(\"/api/v1/tasks\")"}
+      ],
+      "explanation": "This exact claim was misaligned in an earlier draft of this doc (see repo's top-level README); the current docs-good text has been corrected and now matches the code.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f11",
+      "claim": "patterns/add-a-consumer.md's described steps (config block with connector/topic/failure-strategy/enabled; @ApplicationScoped class with an @Incoming method) match both of the repo's real consumers.",
+      "doc_source": "examples/sample-service/docs-good/patterns/add-a-consumer.md",
+      "doc_location": "Steps, lines 8-12",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java", "line": 11, "note": "@ApplicationScoped + @Incoming shape"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java", "line": 12, "note": "same shape"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 2, "note": "task-events config block has connector/topic/failure-strategy/enabled"}
+      ],
+      "explanation": "Both consumers follow the documented pattern exactly (2/2, 0 deviations) — see finding f27 for the evaluation-pass extensibility credit for this same fact.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f12",
+      "claim": "architecture.md's Key Components table, whose declared source scope (src/main/java/com/example/tasks/**) includes the service/ and repository/ packages, does not list TaskService or TaskRepository as rows even though it lists four other classes at the same per-class granularity.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Key Components table, lines 17-24 (frontmatter sources, line 4)",
+      "classification": "gap",
+      "dimension": "correctness",
+      "severity": "low",
+      "packages": ["com.example.tasks.service", "com.example.tasks.repository"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java", "line": 10, "note": "public class TaskService — a full service-layer class, not listed in the component table"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/repository/TaskRepository.java", "line": 8, "note": "public class TaskRepository — a full persistence-layer class, not listed in the component table"}
+      ],
+      "explanation": "Both classes are in-scope per the doc's own frontmatter and are referenced by name in prose elsewhere in the same doc ('backed by TaskRepository', Data Flow item 1), but neither gets a row in the table that otherwise enumerates the service's classes. Low-value by itself (these are thin pass-through layers today) but the table presents itself as a components overview at exactly this granularity.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f13",
+      "check_id": "scale-requirements.a",
+      "claim": "technical-vision.md states a concrete target throughput (200 req/s peak across all REST endpoints; 50 msg/s sustained per message channel) and a latency SLO (p99 < 300ms REST; informal 5s p99 message-processing expectation).",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets, lines 5-10",
+      "classification": "strength",
+      "dimension": "scale-requirements",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 5, "note": "target load and latency budget stated with real numbers"}
+      ],
+      "explanation": "A concrete, specific target exists — every scalability judgment elsewhere in this report can be calibrated against a real number instead of a guess.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f14",
+      "check_id": "scale-requirements.b",
+      "claim": "technical-vision.md states an explicit growth horizon: 3x within 12 months as the reminder feature rolls out beyond the current beta cohort.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets, lines 5-7",
+      "classification": "strength",
+      "dimension": "scale-requirements",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 7, "note": "'Expected growth: 3x within 12 months...'"}
+      ],
+      "explanation": "A distinct fact from f13 (throughput/latency) — a named growth horizon, not just a snapshot target.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f15",
+      "check_id": "extensibility-requirements.a",
+      "claim": "technical-vision.md names three concrete future message channels (task-assigned, task-overdue, task-escalated) with an explicit timeline of one per quarter for the next year.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets, lines 11-13",
+      "classification": "strength",
+      "dimension": "extensibility-requirements",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 12, "note": "named candidates with a quarterly cadence"}
+      ],
+      "explanation": "Both a named target set and a timeline are present, not just one or the other.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f16",
+      "check_id": "extensibility-requirements.b",
+      "claim": "technical-vision.md states an explicit cost bar for each new channel: under a day of engineering time given the existing pattern.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets, lines 11-13",
+      "classification": "strength",
+      "dimension": "extensibility-requirements",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 13, "note": "'wants each addition to take under a day of engineering time'"}
+      ],
+      "explanation": "This bar is carried forward and checked directly in f27 (extensibility.a: is the pattern actually cheap to follow?).",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f17",
+      "check_id": "vision-alignment.a",
+      "claim": "docs-good/technical-vision.md is a substantive vision document covering scale targets, versioning policy, design philosophy, key architectural decisions, and forward-looking work — not empty scaffolding.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "whole document, lines 1-53",
+      "classification": "strength",
+      "dimension": "vision-alignment",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 1, "note": "5 substantive sections, 53 lines"}
+      ],
+      "explanation": "Unlike docs-bad's empty vision doc (per the repo's own README), this doc gives real, checkable content for every other evaluation-pass check to calibrate against.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f18",
+      "check_id": "vision-alignment.b",
+      "claim": "technical-vision.md's growth narrative for task-reminders assumes a per-cohort rollout state ('rolling out to all users, not just the current beta cohort'), but no per-user or per-cohort gating code exists anywhere in the repo — the only rollout control is a single binary, environment-wide enabled flag.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets, line 7",
+      "classification": "risk",
+      "dimension": "vision-alignment",
+      "severity": "medium",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 7, "note": "'not just the current beta cohort'"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java", "line": 15, "note": "onReminderDue processes unconditionally, no cohort/user-segment check"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 12, "note": "only a binary enabled flag exists for this channel"}
+      ],
+      "explanation": "Either the cohort gating lives entirely outside this repo (plausible, unverifiable from here), or the vision's stated growth premise doesn't match the implementation's actual gating granularity — worth resolving explicitly rather than leaving implicit.",
+      "recommendation": "Confirm where beta-cohort gating actually lives (this repo, a gateway, or a separate flagging service) and document it in technical-vision.md; if it doesn't exist anywhere yet, it's a prerequisite for the stated 3x-growth-via-full-rollout plan, not an implementation detail.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -ri 'cohort|beta|segment|percentage' across src/ — no matches outside the doc text itself"],
+      "limitations": []
+    },
+    {
+      "id": "f19",
+      "check_id": "vision-alignment.b",
+      "claim": "technical-vision.md's Key Architectural Decisions section explicitly names the composite/partitioned key on Task and calls the known JPA @Id/DDL mismatch an accepted, tracked risk from that decision — matching the actual mismatch found directly in code.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Key Architectural Decisions, lines 41-44",
+      "classification": "strength",
+      "dimension": "vision-alignment",
+      "severity": "info",
+      "packages": ["com.example.tasks.entity"],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 43, "note": "'accepted, tracked risk from this decision, not an oversight'"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/entity/Task.java", "line": 16, "note": "matches the actual @Id/DDL mismatch"}
+      ],
+      "explanation": "The vision doc doesn't just avoid contradicting the code — it correctly and specifically anticipates a real piece of debt found independently elsewhere in this same report (f20), which is a stronger form of alignment than mere non-contradiction.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "schema"],
+      "limitations": []
+    },
+    {
+      "id": "f20",
+      "check_id": "data-architecture.a",
+      "claim": "Task's JPA @Id is a single column (id) while the real DDL primary key is composite (CreatedDate, Id) — Hibernate's identity/equality/caching model doesn't match the actual relational key.",
+      "doc_source": "examples/sample-service/docs-good/data-model.md",
+      "doc_location": "Known limitation, lines 15-20",
+      "classification": "risk",
+      "dimension": "data-architecture",
+      "severity": "high",
+      "packages": ["com.example.tasks.entity"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/entity/Task.java", "line": 16, "note": "@Id private String id"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 20, "note": "PRIMARY KEY (`CreatedDate`, `Id`)"}
+      ],
+      "explanation": "Independent evaluation-pass judgment on the same fact data-model.md discloses (f8): the doc's honest disclosure doesn't itself fix the identity mismatch. Two Task rows with the same id but different CreatedDate collide as 'the same entity' from Hibernate's point of view.",
+      "recommendation": "Map the real composite key explicitly (@IdClass or @EmbeddedId spanning CreatedDate+Id), or if single-column identity is provably safe in practice (e.g. id is already globally unique and CreatedDate never participates in equality/caching decisions today), document that reasoning explicitly rather than leaving the mismatch open.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "schema"],
+      "limitations": []
+    },
+    {
+      "id": "f21",
+      "check_id": "data-architecture.b",
+      "claim": "sql/001-task.sql mixes PascalCase columns (Id, Status, CreatedDate, CreatedAt, CompletedAt) with camelCase columns added later (priority, assigneeId) without normalizing to the table's established convention.",
+      "doc_source": "examples/sample-service/docs-good/data-model.md",
+      "doc_location": "Also known, lines 21-22",
+      "classification": "risk",
+      "dimension": "data-architecture",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 13, "note": "PascalCase columns"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 18, "note": "camelCase priority"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 19, "note": "camelCase assigneeId"}
+      ],
+      "explanation": "Direct historical evidence of ad hoc, unreviewed schema growth (5 PascalCase columns from the original design, 2 camelCase columns added later) — cosmetic today but a real drift signal for future maintainers.",
+      "recommendation": "Normalize naming convention on the next schema touch (expand/contract: add normalized-name columns, backfill, then drop the old ones) rather than letting the convention keep splitting.",
+      "confidence": "high",
+      "evidence_type": ["schema"],
+      "limitations": []
+    },
+    {
+      "id": "f22",
+      "check_id": "data-architecture.d",
+      "claim": "sql/001-task.sql's partition list has a finite, hardcoded horizon (six monthly partitions plus a pMax catch-all) and no automated job anywhere in this codebase adds new partitions ahead of it.",
+      "doc_source": "examples/sample-service/docs-good/data-model.md",
+      "doc_location": "Also known, lines 22-23",
+      "classification": "risk",
+      "dimension": "data-architecture",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 23, "note": "PARTITION BY RANGE COLUMNS(`CreatedDate`) — 6 dated partitions + pmax catch-all"}
+      ],
+      "explanation": "The horizon itself is currently a decade out (per the file's own comment, deliberately pushed out so this stays a stable example) — the finding is the absence of an automation job, not near-term urgency, and holds regardless of how far off the horizon is.",
+      "recommendation": "Add a scheduled job (or a migration-tooling step) that extends the partition list ahead of the horizon automatically, so the eventual catch-all-partition cliff is never reached silently.",
+      "confidence": "high",
+      "evidence_type": ["schema", "negative-search"],
+      "searches_performed": ["searched src/ for any partition-maintenance/extension job — none found; only TaskCleanupJob exists and it archives rows, it doesn't manage partitions"],
+      "limitations": []
+    },
+    {
+      "id": "f23",
+      "check_id": "data-architecture.f",
+      "claim": "technical-vision.md names recurring tasks as the next planned feature, requiring a new relationship between Task rows across cycles — the current schema has no self-referencing or cycle-linking column to model that relationship.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Future Direction, lines 48-51",
+      "classification": "risk",
+      "dimension": "data-architecture",
+      "severity": "medium",
+      "packages": ["com.example.tasks.entity"],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 49, "note": "'a new relationship between Task rows across cycles that the current schema doesn't model yet'"},
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 12, "note": "full column list — no parent/cycle-reference column exists"}
+      ],
+      "explanation": "The vision doc itself flags this as an open question ('expect this to be a real test of whether the current partition/identity design holds up'); the schema check confirms no groundwork exists yet.",
+      "recommendation": "Before building recurring tasks, decide the cycle-linking model (self-referencing parent_task_id vs. a separate recurrence table) and validate it against the existing composite partition key — a naive self-FK on a partitioned, composite-keyed table has its own constraints worth resolving on paper first.",
+      "confidence": "high",
+      "evidence_type": ["schema", "direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f24",
+      "check_id": "scalability.a",
+      "claim": "task-events' Kafka consumer concurrency is hardcoded to 1 with no environment-variable override, unlike the same channel's enabled flag one line below it, which is env-overridable.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "scalability",
+      "severity": "medium",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 5, "note": "concurrency=1, literal"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 6, "note": "enabled=${TASK_EVENTS_CONSUMER_ENABLED:true}, env-overridable, for contrast"}
+      ],
+      "explanation": "At the stated target of 50 msg/s sustained (technical-vision.md), a single-threaded consumer's ability to keep up depends entirely on per-message processing time, which is unstated — this caps throughput below the target the moment per-message time exceeds ~20ms, with no config lever to raise it.",
+      "recommendation": "Make task-events concurrency env-overridable (e.g. ${TASK_EVENTS_CONCURRENCY:1}) the same way enabled already is, so the sustained-throughput target can be met by config change rather than a redeploy if a single-threaded consumer ever falls behind.",
+      "confidence": "high",
+      "evidence_type": ["configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f25",
+      "check_id": "scalability.a",
+      "claim": "task.cleanup.worker-count is hardcoded to 1 with no environment override, unlike notification.batch-size three lines below it in the same file, which is env-overridable.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "scalability",
+      "severity": "medium",
+      "packages": ["com.example.tasks.scheduler"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 15, "note": "task.cleanup.worker-count=1, literal"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 18, "note": "notification.batch-size=${NOTIFICATION_BATCH_SIZE:50}, env-overridable, for contrast"}
+      ],
+      "explanation": "A distinct hardcoded-capacity finding from f24 — different config key, different code path (the hourly archival job, not the message consumer), same underlying pattern (no override lever).",
+      "recommendation": "Make task.cleanup.worker-count env-overridable following the same ${ENV:default} pattern already used elsewhere in this exact file, so archival throughput can scale without a code change and redeploy.",
+      "confidence": "high",
+      "evidence_type": ["configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f26",
+      "check_id": "performance-cost.a",
+      "claim": "POST /api/v1/tasks/bulk-import accepts an unbounded List<Task> with no size cap or rate guardrail, unlike notification.batch-size elsewhere in the same codebase, which bounds a similar bulk operation via configurable batch size.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "performance-cost",
+      "severity": "medium",
+      "packages": ["com.example.tasks.resource", "com.example.tasks.service"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 34, "note": "bulkImport(List<Task> tasks) — no size validation"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/service/TaskService.java", "line": 24, "note": "tasks.forEach(taskRepository::save) — unbounded loop"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 18, "note": "notification.batch-size, a structurally similar bulk operation elsewhere in the same file, IS bounded/configurable"}
+      ],
+      "explanation": "The inconsistency between two structurally similar bulk-operation call sites (one guarded, one not) is a stronger finding than 'there's no size limit' in isolation.",
+      "recommendation": "Cap bulk-import's accepted list size (mirroring the bounded/configurable pattern already used for notification.batch-size), or chunk it server-side, so one oversized request can't degrade the service or the eventual DB.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f27",
+      "check_id": "extensibility.a",
+      "claim": "patterns/add-a-consumer.md's described steps match both of the repo's actual consumers exactly — 2 of 2 instances follow the pattern, 0 diverge.",
+      "doc_source": "examples/sample-service/docs-good/patterns/add-a-consumer.md",
+      "doc_location": "Steps, lines 8-12",
+      "classification": "strength",
+      "dimension": "extensibility",
+      "severity": "info",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java", "line": 11, "note": "follows the pattern exactly"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java", "line": 12, "note": "follows the pattern exactly"}
+      ],
+      "explanation": "Exact count (grep -c across the consumer package): 2 @Incoming methods, both matching the documented shape. This directly supports the <1-day extensibility cost bar stated in technical-vision.md (f16) — the pattern really is that thin.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f28",
+      "check_id": "extensibility.b",
+      "claim": "task-events' consumer config block explicitly sets a concurrency value; task-reminders' otherwise-identical config block has no concurrency setting at all, and add-a-consumer.md's pattern doc doesn't mention concurrency as a step, so nothing governs this drift.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "extensibility",
+      "severity": "medium",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 5, "note": "task-events has an explicit concurrency setting"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 9, "note": "task-reminders block — no concurrency key present"},
+        {"file": "examples/sample-service/docs-good/patterns/add-a-consumer.md", "line": 8, "note": "pattern doc's steps list connector/topic/failure-strategy/enabled — concurrency isn't mentioned as a required step at all"}
+      ],
+      "explanation": "The same conceptual per-channel-throughput concern is configured explicitly for one channel and left to an undocumented framework default for its sibling — the same shape of inconsistency extensibility.a's pattern-doc check looks for, just in a spot the pattern doc doesn't cover.",
+      "recommendation": "Either give task-reminders the same explicit, env-overridable concurrency setting task-events has, or add 'set an explicit concurrency value' as a required step in add-a-consumer.md so future channels don't inherit this same silent asymmetry.",
+      "confidence": "high",
+      "evidence_type": ["configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f29",
+      "check_id": "observability.a",
+      "claim": "None of this service's three most critical live paths — TaskEventConsumer, TaskReminderConsumer, TaskCleanupJob — emit any traffic, error, latency, or saturation signal; a repo-wide search found no logging or metrics library usage anywhere in the source tree.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "high",
+      "packages": ["com.example.tasks.consumer", "com.example.tasks.scheduler"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java", "line": 14, "note": "no logging/metrics call anywhere in the method body"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskReminderConsumer.java", "line": 15, "note": "same"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java", "line": 16, "note": "same"},
+        {"note": "grep -riE 'Logger|log\\.(info|warn|error|debug)|Micrometer|Counter|Timer|Metric' across src/ — 0 matches repo-wide"}
+      ],
+      "explanation": "Traffic/errors are usually the easiest signals to find and are routinely present even in thin codebases — here even those are entirely absent, across all three paths uniformly, not just the harder saturation/latency signals.",
+      "recommendation": "Add at minimum a processed/failed counter (traffic+errors) and a processing-duration timer (latency) to each of the three critical paths, plus a consumer-lag/queue-depth signal (saturation) for the two Kafka consumers — right now an operator can't distinguish 'silent and fine' from 'silent and broken' for any of them.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -riE 'Logger|log\\.(info|warn|error|debug)|Micrometer|Counter|Timer|Metric' -r examples/sample-service/src — 0 matches"],
+      "limitations": []
+    },
+    {
+      "id": "f30",
+      "check_id": "observability.b",
+      "claim": "The known failure mode this service explicitly accepts — a message on task-events or task-reminders that fails and gets dropped via failure-strategy=ignore — produces no output at all, not even a log line: failure-strategy=ignore is pure connector configuration, and neither consumer's method body contains any failure-handling code path.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Design Philosophy, lines 29-33",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "high",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 4, "note": "failure-strategy=ignore, task-events"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 11, "note": "failure-strategy=ignore, task-reminders"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/consumer/TaskEventConsumer.java", "line": 14, "note": "no try/catch or failure branch in the method body"},
+        {"note": "grep -ri 'catch|failure|dlq|log' across consumer/ — no failure-handling code found"}
+      ],
+      "explanation": "This traces the exact code path technical-vision.md's own 'no metric confirming the actual drop rate' gap points to, and finds it's worse than a log-line gap — there is zero code involvement in a drop at all; the framework discards the message before any application code runs.",
+      "recommendation": "Wrap each @Incoming method body to increment a 'dropped' counter on failure before the framework discards the message — this is the concrete first step to closing the gap technical-vision.md already flags, and today there isn't even a log line to build on.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration", "negative-search"],
+      "searches_performed": ["grep -ri 'catch|failure|dlq|log' across src/main/java/com/example/tasks/consumer — no failure-handling code found"],
+      "limitations": []
+    },
+    {
+      "id": "f31",
+      "check_id": "reliability-resilience.a",
+      "claim": "Neither POST /api/v1/tasks nor POST /api/v1/tasks/bulk-import has an idempotency-key mechanism, a client-supplied dedup token, or a database-level uniqueness safeguard visible in this repo.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.tasks.resource", "com.example.tasks.service"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 18, "note": "create() — no idempotency header/param"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 34, "note": "bulkImport() — same"},
+        {"note": "grep -ri idempoten across the whole repo — 0 matches"}
+      ],
+      "explanation": "A client retry after a timeout on either write endpoint has no safeguard against duplicate task creation visible at the API/service layer.",
+      "recommendation": "Add an idempotency-key header (or treat a client-supplied id as a natural dedup key backed by a DB unique constraint) on POST /api/v1/tasks, so a retried request can't create a duplicate; apply the same per-item to bulk-import.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -ri idempoten -r examples/sample-service — 0 matches", "read TaskResource.java/TaskService.java/TaskRepository.java in full — no dedup/upsert logic anywhere"],
+      "limitations": ["TaskRepository.save() is an unimplemented stub in this fixture ('no real persistence provider is wired up'), so whether a real persistence layer would upsert on retry can't be confirmed from code — this finding is about the absence of any idempotency safeguard visible at the API/service layer, not a claim about undiscoverable runtime DB behavior."]
+    },
+    {
+      "id": "f32",
+      "check_id": "reliability-resilience.b",
+      "claim": "application.properties contains no timeout, retry-budget, circuit-breaker, or bulkhead configuration for either of this service's two real dependency types — the Kafka broker connection and the eventual database behind TaskRepository.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.tasks.repository", "com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 1, "note": "full 18-line file — no datasource/timeout/circuit-breaker properties anywhere"},
+        {"note": "grep -riE 'timeout|circuit|bulkhead|retry' across application.properties and src — 0 matches beyond the unrelated 'failure-strategy' key"}
+      ],
+      "explanation": "Relying entirely on whatever undocumented defaults the underlying client libraries ship with — no config surface exists to point to if a DB or broker slowdown needs to be diagnosed or bounded.",
+      "recommendation": "Set explicit connection/read timeouts (and, once a real persistence provider is wired up, a connection-pool size and circuit-breaker) rather than inheriting library defaults silently.",
+      "confidence": "medium",
+      "evidence_type": ["configuration", "negative-search"],
+      "searches_performed": ["grep -riE 'timeout|circuit|bulkhead|retry' -r examples/sample-service/src examples/sample-service/src/main/resources/application.properties — 0 relevant matches"],
+      "limitations": []
+    },
+    {
+      "id": "f33",
+      "check_id": "reliability-resilience.c",
+      "claim": "Both task-events and task-reminders are configured failure-strategy=ignore with no dead-letter topic/producer anywhere in this repo — a poison message is silently and permanently dropped with no operator visibility and no replay path, regardless of how deliberately the team chose this tradeoff.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Design Philosophy, lines 29-33",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 4, "note": "failure-strategy=ignore, task-events"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 11, "note": "failure-strategy=ignore, task-reminders"},
+        {"note": "grep -ri 'dlq|dead.letter|dead-letter' across src and application.properties — 0 matches"}
+      ],
+      "explanation": "A confirmed doc/code match (the docs accurately describe this behavior — see f3/f4) doesn't make the underlying pattern low-risk on its own merits; judged independently here as the evaluation pass requires.",
+      "recommendation": "Even keeping the 'availability over strict delivery' philosophy, route dropped messages to a DLQ topic instead of discarding them outright — this preserves the same non-blocking behavior for the live queue while making drops recoverable/replayable and countable, directly feeding the drop-rate metric technical-vision.md already flags as missing.",
+      "confidence": "high",
+      "evidence_type": ["configuration", "negative-search"],
+      "searches_performed": ["grep -ri 'dlq|dead.letter|dead-letter' -r examples/sample-service/src examples/sample-service/src/main/resources/application.properties — 0 matches"],
+      "limitations": []
+    },
+    {
+      "id": "f34",
+      "check_id": "reliability-resilience.d",
+      "claim": "TaskCleanupJob.archiveOldTasks() is described as moving completed tasks into a separate archive store — an implicit two-step operation — but the method body is an unimplemented stub, so there is no code evidence of it being wrapped in a transaction, using an outbox pattern, or having a compensating action if the second step fails after the first commits.",
+      "doc_source": "examples/sample-service/docs-good/architecture.md",
+      "doc_location": "Data Flow, item 4, lines 34-35",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.tasks.scheduler"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java", "line": 17, "note": "comment-only stub body, no implementation"}
+      ],
+      "explanation": "This repo has no producer/@Outgoing code anywhere (verified by grep), so the classic 'DB write + event publish' transaction-boundary example doesn't apply here — the only multi-step write candidate is this archival move, and it can't be confirmed either way because it isn't implemented yet.",
+      "recommendation": "When implementing archiveOldTasks(), wrap the move in a single DB transaction (or an outbox/two-phase pattern if archive storage is a separate system) so a mid-operation failure can't leave a task counted in neither table or in both.",
+      "confidence": "low",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -riE '@Outgoing|Emitter' -r examples/sample-service/src — 0 matches, confirming no producer-side multi-step write path exists elsewhere in this repo either"],
+      "limitations": ["archiveOldTasks() has no implementation in this repo (comment-only stub), so this finding is about the absence of visible transactional-boundary evidence, not a confirmed defect in a real implementation — it should be re-checked once the method is actually built."]
+    },
+    {
+      "id": "f35",
+      "check_id": "reliability-resilience.e",
+      "claim": "No document in docs-good states a recovery point or recovery time objective for this service's data, despite its message channels being explicitly designed to accept permanent data loss on failure.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "searched all of docs-good for 'RPO'/'RTO'/'recovery point'/'recovery time' — no matches",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 32, "note": "'there is currently no metric confirming the actual drop rate, which is itself tracked as a gap' — a measurement gap, not a recovery target"},
+        {"note": "grep -ri 'RPO|RTO|recovery point|recovery time|backup' across docs-good/ — 0 matches"}
+      ],
+      "explanation": "Distinct from f30 (observability.b, which is about whether the drop produces a metric vs. nothing): this is about whether any recovery mechanism or quantified acceptable-loss bound exists at all, a different question from measurement.",
+      "recommendation": "Given the service explicitly accepts message loss as policy, state a quantified bound on what's acceptable (e.g. 'drop rate must stay under X% measured weekly') so the currently-informal 'low-cost to miss one' assumption becomes a testable target instead of an unverified belief.",
+      "confidence": "medium",
+      "evidence_type": ["negative-search"],
+      "searches_performed": ["grep -ri 'RPO|RTO|recovery point|recovery time|backup' -r examples/sample-service/docs-good — 0 matches"],
+      "limitations": []
+    },
+    {
+      "id": "f36",
+      "check_id": "change-safety.a",
+      "claim": "REST endpoints are versioned in code (TaskResource's /api/v1/ prefix) and technical-vision.md documents an explicit deprecation policy for both REST endpoints and message channels.",
+      "doc_source": "examples/sample-service/docs-good/technical-vision.md",
+      "doc_location": "Versioning & Deprecation Policy, lines 17-25",
+      "classification": "strength",
+      "dimension": "change-safety",
+      "severity": "info",
+      "packages": ["com.example.tasks.resource"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 10, "note": "@Path(\"/api/v1/tasks\")"},
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 23, "note": "mark @Deprecated, note removal target date, treat removal as a separate reviewed change"}
+      ],
+      "explanation": "Versioning is implemented (not just planned) for REST, and a specific, actionable deprecation process is documented for both surfaces.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": ["The channel-retirement half of this policy and the @Deprecated-marking step have never actually been exercised in this repo's history (all 8 commits are the initial fixture build, same day) — this finding credits the policy being stated and the REST half being implemented, not a track record of it working in practice."]
+    },
+    {
+      "id": "f37",
+      "check_id": "change-safety.b",
+      "claim": "This repo has no migration-file naming convention or migration framework — the only real schema change in this repo's git history was an in-place edit to the single existing DDL file, not a new versioned migration.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "medium",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 1, "note": "only DDL file in the repo"},
+        {"note": "git log --follow --oneline -- examples/sample-service/sql/001-task.sql shows exactly 2 commits: initial file creation, then one in-place edit (partition date values + comment only) to the same file — no 002-*.sql file or migration-tool directory exists anywhere"}
+      ],
+      "explanation": "No established expand/contract discipline exists to observe or rely on for the next actual breaking change (e.g. the already-flagged column-casing cleanup, f21).",
+      "recommendation": "Adopt a numbered/versioned migration file convention (e.g. Flyway-style V1__/V2__) before the next real schema change, particularly the column-casing cleanup already flagged in f21 — that's exactly the kind of change an expand/contract discipline needs to exist for before it's attempted live.",
+      "confidence": "medium",
+      "evidence_type": ["schema", "git-history", "negative-search"],
+      "searches_performed": ["find examples/sample-service -iname '*flyway*' -o -iname '*liquibase*' -o -path '*db/migration*' — 0 matches", "git log --follow --oneline -- examples/sample-service/sql/001-task.sql — 2 commits total"],
+      "limitations": ["Sample size is intentionally tiny (one table, one real historical change, that change itself non-breaking) — this finding is about the absence of an established convention, not evidence the team has ever actually mishandled a breaking change."]
+    },
+    {
+      "id": "f38",
+      "check_id": "change-safety.e",
+      "claim": "The only rollout control mechanism found anywhere in this codebase is a binary, per-environment enabled flag on each message consumer — no percentage-rollout, canary, or per-user/per-cohort feature-flagging library or configuration exists anywhere in the repo.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "medium",
+      "packages": ["com.example.tasks.consumer"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 6, "note": "binary enabled flag, task-events"},
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 12, "note": "binary enabled flag, task-reminders"},
+        {"note": "grep -ri 'feature.?flag|canary|percentage|rollout|launchdarkly|split.io|togglz' across the repo — 0 matches beyond the enabled=${ENV:...} pattern itself"}
+      ],
+      "explanation": "Any risky change ships all-or-nothing within an environment; related to but distinct from f18's vision-alignment finding (that one is about whether the vision's cohort narrative matches reality; this one is about whether the general rollout-control capability exists in the codebase at all).",
+      "recommendation": "For a risky change (e.g. the composite-key remap or column-casing cleanup already flagged elsewhere), a percentage-based or cohort-based rollout path would materially lower blast radius versus today's only lever (a full on/off switch per environment).",
+      "confidence": "high",
+      "evidence_type": ["configuration", "negative-search"],
+      "searches_performed": ["grep -riE 'feature.?flag|canary|percentage|rollout|launchdarkly|split\\.io|togglz' -r examples/sample-service — 0 matches beyond the enabled=${ENV:...} pattern"],
+      "limitations": []
+    },
+    {
+      "id": "f39",
+      "check_id": "security-boundaries.a",
+      "claim": "None of this service's three externally-reachable REST endpoints has any authentication or authorization mechanism — no @RolesAllowed, @Authenticated, security-context check, or auth-related configuration exists anywhere in the repo.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "security-boundaries",
+      "severity": "high",
+      "packages": ["com.example.tasks.resource"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 10, "note": "full class (lines 10-37), no security annotations on the class or any of its 3 methods"},
+        {"note": "grep -riE 'RolesAllowed|Authenticated|oidc|security|jwt|@PermitAll|@DenyAll' across src — 0 matches; also checked application.properties for oidc/security config — 0 matches"}
+      ],
+      "explanation": "All three endpoints are equally unprotected (uniform absence, not an inconsistency between siblings) — but a total absence of any in-service auth mechanism on a system classified production-service is itself the risk, independent of consistency.",
+      "recommendation": "Enumerate the intended trust model explicitly (gateway-enforced vs. in-service) and, if in-service, add auth (at minimum @RolesAllowed or an equivalent filter) to all three endpoints uniformly, prioritizing bulk-import given its larger per-call blast radius.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "configuration", "negative-search"],
+      "searches_performed": ["grep -riE 'RolesAllowed|Authenticated|oidc|security|jwt|@PermitAll|@DenyAll' -r examples/sample-service/src — 0 matches"],
+      "limitations": ["Authentication is sometimes delegated to an API gateway or sidecar outside the service's own code, and no deployment manifest exists in this repo to confirm or rule that out either way — this finding says no authN/authZ configuration exists in this repository, not that the deployed system is provably unauthenticated end-to-end."]
+    },
+    {
+      "id": "f40",
+      "check_id": "security-boundaries.d",
+      "claim": "None of the three REST endpoints validates its input — no jakarta.validation import, @Valid, @NotNull, @Size, or @Min/@Max annotation exists anywhere in TaskResource.java or Task.java.",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "N/A",
+      "classification": "risk",
+      "dimension": "security-boundaries",
+      "severity": "medium",
+      "packages": ["com.example.tasks.resource", "com.example.tasks.entity"],
+      "evidence": [
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 18, "note": "create() accepts a full Task with no validation"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/resource/TaskResource.java", "line": 34, "note": "bulkImport() accepts an unbounded, unvalidated list"},
+        {"file": "examples/sample-service/src/main/java/com/example/tasks/entity/Task.java", "line": 14, "note": "no Bean Validation constraints on any field"},
+        {"note": "grep -riE 'jakarta.validation|@Valid|@NotNull|@Size\\(|@Min\\(|@Max\\(' across src — 0 matches"}
+      ],
+      "explanation": "create and bulk-import accept a full client-supplied Task object (including id, status, priority) with no constraint on any field; the eventual persistence layer is the only thing that could reject bad data, and it's currently an unimplemented stub.",
+      "recommendation": "Add Bean Validation constraints on Task's fields (status as an enum/allowed-value set, priority bounds, id format) and @Valid on the two write endpoints' parameters.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -riE 'jakarta.validation|@Valid|@NotNull|@Size\\(|@Min\\(|@Max\\(' -r examples/sample-service/src — 0 matches"],
+      "limitations": []
+    }
+  ]
+}

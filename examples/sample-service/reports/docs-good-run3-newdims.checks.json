@@ -1,0 +1,310 @@
+{
+  "checks": [
+    {
+      "id": "scale-requirements.a",
+      "dimension": "scale-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f13"]
+    },
+    {
+      "id": "scale-requirements.b",
+      "dimension": "scale-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f14"]
+    },
+    {
+      "id": "scale-requirements.c",
+      "dimension": "scale-requirements",
+      "status": "clean",
+      "scope": ["scalability.a", "performance-cost.a"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 5, "note": "200 req/s peak / 50 msg/s per channel / 3x growth in 12mo figures carried forward and cited explicitly in f24/f25 (scalability.a) to calibrate the hardcoded concurrency=1 / worker-count=1 findings against a real target instead of a guess."}
+      ]
+    },
+    {
+      "id": "extensibility-requirements.a",
+      "dimension": "extensibility-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f15"]
+    },
+    {
+      "id": "extensibility-requirements.b",
+      "dimension": "extensibility-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f16"]
+    },
+    {
+      "id": "vision-alignment.a",
+      "dimension": "vision-alignment",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f17"]
+    },
+    {
+      "id": "vision-alignment.b",
+      "dimension": "vision-alignment",
+      "status": "risk",
+      "scope": ["TaskReminderConsumer", "Task"],
+      "confidence": "medium",
+      "finding_ids": ["f18", "f19"]
+    },
+    {
+      "id": "data-architecture.a",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["Task"],
+      "confidence": "high",
+      "finding_ids": ["f20"]
+    },
+    {
+      "id": "data-architecture.b",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "finding_ids": ["f21"]
+    },
+    {
+      "id": "data-architecture.c",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 1, "note": "grep for FOREIGN KEY/REFERENCES across the only DDL file in this repo — zero matches. Single-table schema; assigneeId (indexed, not FK-constrained) most plausibly refers to a user identity owned by another service/bounded context, the expected pattern at a service boundary rather than a gap. Referential-integrity strategy can't be meaningfully stress-tested further within a one-table schema."}
+      ]
+    },
+    {
+      "id": "data-architecture.d",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "finding_ids": ["f22"]
+    },
+    {
+      "id": "data-architecture.e",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["Task"],
+      "reason": "No monetary/currency-bearing column exists anywhere in this schema (task-tracking domain: status, dates, priority, assignee — no amounts). The decimal-vs-float/currency-handling check has no in-scope instance to evaluate against."
+    },
+    {
+      "id": "data-architecture.f",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["Task", "docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f23"]
+    },
+    {
+      "id": "data-architecture.g",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 12, "note": "grepped the DDL for JSON/BLOB/TEXT column types — none found; all 7 columns are scalar (VARCHAR/INT/DATETIME). No shadow/parallel schemaless representation of Task exists."}
+      ]
+    },
+    {
+      "id": "scalability.a",
+      "dimension": "scalability",
+      "status": "risk",
+      "scope": ["application.properties"],
+      "confidence": "high",
+      "finding_ids": ["f24", "f25"]
+    },
+    {
+      "id": "performance-cost.a",
+      "dimension": "performance-cost",
+      "status": "risk",
+      "scope": ["TaskResource", "TaskService"],
+      "confidence": "medium",
+      "finding_ids": ["f26"]
+    },
+    {
+      "id": "extensibility.a",
+      "dimension": "extensibility",
+      "status": "strength",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "confidence": "high",
+      "finding_ids": ["f27"]
+    },
+    {
+      "id": "extensibility.b",
+      "dimension": "extensibility",
+      "status": "risk",
+      "scope": ["application.properties"],
+      "confidence": "high",
+      "finding_ids": ["f28"]
+    },
+    {
+      "id": "observability.a",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer", "TaskCleanupJob"],
+      "confidence": "high",
+      "finding_ids": ["f29"]
+    },
+    {
+      "id": "observability.b",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "confidence": "high",
+      "finding_ids": ["f30"]
+    },
+    {
+      "id": "maintainability.a",
+      "dimension": "maintainability",
+      "status": "clean",
+      "scope": ["analysis/churn.json"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "examples/sample-service/analysis/churn.json", "line": 93, "note": "bus_factor_hotspots and high_diversity_hotspots both empty; every package shows 1-2 total commits, distinct_authors=1. Sanity-checked with git log --no-merges --pretty=format:%an across the whole repo: 8 commits, 1 author, all on the same day. There simply isn't enough git history for a bus-factor signal to be meaningful yet — a 'nothing to report yet' clean, not a 'verified no bus-factor risk' clean; noted as a limitation, not overclaimed."}
+      ]
+    },
+    {
+      "id": "maintainability.b",
+      "dimension": "maintainability",
+      "status": "clean",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "confidence": "high",
+      "evidence": [
+        {"note": "extensibility.a (f27) found 100% (2/2) adoption of the documented consumer pattern, zero inconsistent instances — no replication-cost tax to calculate here. Would become a real finding the moment a 3rd, non-conforming consumer is added."}
+      ]
+    },
+    {
+      "id": "reliability-resilience.a",
+      "dimension": "reliability-resilience",
+      "status": "risk",
+      "scope": ["TaskResource", "TaskService"],
+      "confidence": "medium",
+      "finding_ids": ["f31"]
+    },
+    {
+      "id": "reliability-resilience.b",
+      "dimension": "reliability-resilience",
+      "status": "risk",
+      "scope": ["application.properties", "TaskRepository"],
+      "confidence": "medium",
+      "finding_ids": ["f32"]
+    },
+    {
+      "id": "reliability-resilience.c",
+      "dimension": "reliability-resilience",
+      "status": "risk",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "confidence": "high",
+      "finding_ids": ["f33"]
+    },
+    {
+      "id": "reliability-resilience.d",
+      "dimension": "reliability-resilience",
+      "status": "risk",
+      "scope": ["TaskCleanupJob"],
+      "confidence": "low",
+      "finding_ids": ["f34"]
+    },
+    {
+      "id": "reliability-resilience.e",
+      "dimension": "reliability-resilience",
+      "status": "risk",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "medium",
+      "finding_ids": ["f35"]
+    },
+    {
+      "id": "change-safety.a",
+      "dimension": "change-safety",
+      "status": "strength",
+      "scope": ["TaskResource", "docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f36"]
+    },
+    {
+      "id": "change-safety.b",
+      "dimension": "change-safety",
+      "status": "risk",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "medium",
+      "finding_ids": ["f37"]
+    },
+    {
+      "id": "change-safety.c",
+      "dimension": "change-safety",
+      "status": "not-applicable",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "reason": "Both consumer method bodies are unimplemented, comment-only stubs (onTaskEvent/onReminderDue take a raw String payload and do nothing with it) — no deserialization code exists yet in this repo to determine strict-vs-lenient field handling for new/unknown fields. Not assessable until real message-handling logic is implemented."
+    },
+    {
+      "id": "change-safety.d",
+      "dimension": "change-safety",
+      "status": "clean",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 1, "note": "The one real historical schema change observed in git (commit 7c22594, pushing the partition horizon out and editing the comment) was purely additive/config — date literals and a comment, no column drop/rename, no data-loss implication. It would revert cleanly via a straight git revert. This does not extend to a hypothetical future breaking change — see change-safety.b for the separate finding that no migration tooling/discipline exists to fall back on for that case."}
+      ]
+    },
+    {
+      "id": "change-safety.e",
+      "dimension": "change-safety",
+      "status": "risk",
+      "scope": ["application.properties"],
+      "confidence": "high",
+      "finding_ids": ["f38"]
+    },
+    {
+      "id": "security-boundaries.a",
+      "dimension": "security-boundaries",
+      "status": "risk",
+      "scope": ["TaskResource"],
+      "confidence": "medium",
+      "finding_ids": ["f39"]
+    },
+    {
+      "id": "security-boundaries.b",
+      "dimension": "security-boundaries",
+      "status": "clean",
+      "scope": ["application.properties", "build.gradle", "src"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/src/main/resources/application.properties", "line": 1, "note": "grep -riE 'password|secret|api[_-]?key|token' across application.properties, build.gradle, and all of src/ — zero matches. No credentials or tokens of any kind (real or default) are present, consistent with no datasource/broker-auth config being present at all in this fixture (see reliability-resilience.b)."}
+      ]
+    },
+    {
+      "id": "security-boundaries.c",
+      "dimension": "security-boundaries",
+      "status": "not-applicable",
+      "scope": ["Task", "src"],
+      "reason": "No PII/financial column exists anywhere in the schema (assigneeId is an opaque id, not a name/email/payment field — see data-architecture field categorization), and observability.a/b already established that zero logging or metrics code exists anywhere in this repo. With nothing logged at all, there is no code path for sensitive data to leak through even if sensitive fields existed."
+    },
+    {
+      "id": "security-boundaries.d",
+      "dimension": "security-boundaries",
+      "status": "risk",
+      "scope": ["TaskResource", "Task"],
+      "confidence": "high",
+      "finding_ids": ["f40"]
+    },
+    {
+      "id": "security-boundaries.e",
+      "dimension": "security-boundaries",
+      "status": "not-applicable",
+      "scope": ["TaskResource"],
+      "reason": "No destructive or admin-privileged operation exists in the current API surface — the three endpoints are create, read, and bulk-create only; there is no delete, bulk-update, or admin endpoint anywhere in this repo to check gating for. bulk-import's blast radius (unbounded list size) is already covered under performance-cost.a rather than double-counted here as a privileged-operation concern."
+    }
+  ]
+}

@@ -304,17 +304,35 @@ features is in use;
 never succeed: infinite retry, DLQ, or silent drop? Read the real failure-strategy config;
 (d) transaction boundaries — for a multi-step operation (e.g. DB write + event publish), what
 happens when step 2 fails after step 1 committed? Look for an outbox pattern or compensating
-action; an undocumented inconsistency window is the finding if neither exists;
+action; an undocumented inconsistency window is the finding if neither exists. **If no multi-step
+write path exists anywhere in this codebase (nothing does more than one side-effecting operation
+per logical action), that's `not-applicable`, not `not-assessed`** — distinct from the case where a
+multi-step path exists but you couldn't verify its failure behavior (record that as a low-
+confidence `risk`/note instead, with the limitation stated). Don't force the same status onto both
+situations;
 (e) recovery expectations — is there a stated or implied recovery point/time objective, and does
 the actual recovery mechanism (backup, replay, dead-letter reprocessing) plausibly meet it given
 the system's stated criticality?
+
+**When the codebase's persistence/business logic is a stub** (illustrative code, no real
+implementation wired up), (a) and (d) above can only be answered at the API-contract level — is
+there an idempotency-key header/parameter accepted at all, does the interface even have a slot for
+one — not at the runtime-behavior level (you can't observe what a stub doesn't do). That's a
+legitimate, narrower way to answer the check, not a failure to investigate; say explicitly that the
+finding is about the contract shape, and note the confidence is lower because runtime behavior
+can't be observed, rather than skipping the check.
 
 **Change safety**:
 (a) API/event schema versioning — are breaking changes versioned, with a stated deprecation policy
 for the superseded version, or silent?
 (b) database migration pattern — check actual migration files/history for expand/contract
 (nullable column added, backfilled, then enforced) vs. a live breaking change (column dropped/
-renamed in place) — this is a code/history check, not a doc-policy check;
+renamed in place) — this is a code/history check, not a doc-policy check. **A young/small repo may
+have too little schema-change history to show either pattern in the act — that's still a real
+finding, just a different claim: the absence of an established migration convention/tooling, not
+"a bad pattern was caught happening."** State it as what it actually is (no expand/contract
+discipline has been established yet, vs. one was established and then violated) rather than forcing
+whatever history exists into the "caught a breaking change" framing;
 (c) consumer/producer compatibility — do consumers tolerate new/unknown fields (forward
 compatibility), and do producers avoid removing fields a consumer still reads? Grep consumer
 deserialization code for strict-vs-lenient field handling;
@@ -326,8 +344,12 @@ rollout path, or is every deploy all-or-nothing?
 
 **Security boundaries**:
 (a) authN/authZ ownership — for each externally-reachable entry point, is there a consistent auth
-mechanism, or do some sit unprotected next to protected siblings? Enumerate the actual entry points
-first (from step 1's boundaries claims or a direct grep), then check each one, don't sample;
+mechanism? Enumerate the actual entry points first (from step 1's boundaries claims or a direct
+grep), then check each one, don't sample. **Two different findings live under this one letter, and
+both are real: some endpoints protected while siblings aren't (an inconsistency finding), or every
+endpoint uniformly unprotected (a different, often more severe finding — no partial credit for
+"at least it's consistent"). Don't assume the check is only asking about inconsistency; uniform
+absence of any auth mechanism is exactly as much this check's job to catch;**
 (b) secret handling — grep for hardcoded/committed credentials, API keys, tokens; confirm real
 secrets are sourced from a secrets manager/env var, not a checked-in default value;
 (c) sensitive-data flow — does PII/financial data get logged, cached, or sent to third-party/
