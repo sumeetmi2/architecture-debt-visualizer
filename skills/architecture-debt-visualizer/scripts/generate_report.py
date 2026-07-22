@@ -24,6 +24,12 @@ Inputs (all JSON):
         }
       ]
     }
+  --checks     optional. Output of the skill's checks.json (see references/report-schema.md):
+               {"checks": [{"id", "dimension", "status", ...}]}. Drives the Audit coverage
+               indicator and the "Check coverage" panel. Absent (reconcile-mode runs, or reports
+               generated before this schema existed) degrades gracefully to "not run".
+  --context    optional. Output of the skill's context.json (system_type classification). Needed
+               alongside --checks to compute Audit coverage's mandatory-check denominator.
   --dep-graph  optional. Output of extract_dep_graph.py. Used for the static-analysis panel
                (package/class/coupling counts), not rendered as a graph.
   --churn      optional. Output of compute_churn.py. Used for the static-analysis panel
@@ -35,15 +41,18 @@ Inputs (all JSON):
 architectural judgment calls. `dimension` and `severity` classify what KIND of concern it is and
 how much it matters, independent of confirmed/misaligned/gap/risk/strength.
 
-The report has three parts: an overall score (see SCORE PHILOSOPHY below), a static-analysis panel
-(deterministic signals from the dep graph / churn data — no LLM judgment in these numbers), and the
-findings themselves (a curated "key findings" shortlist plus the full filterable table).
+The report has four headline indicators (Documentation fidelity, Architecture risk, Audit
+coverage, Evidence confidence — see INDICATOR PHILOSOPHY below) plus a legacy 0-100 Debt index
+kept as a secondary figure, a static-analysis panel, a check-coverage panel (when --checks is
+supplied), and the findings themselves (a curated "key findings" shortlist plus the full
+filterable table).
 
 No third-party dependencies: pure stdlib, single output file (inline CSS/JS).
 """
 import argparse
 import html
 import json
+import os
 
 CLASS_COLOR = {
     "gap": "#d97706",
@@ -106,6 +115,26 @@ SCORE_BANDS = [
     (20, "Significant debt — treat as a priority"),
     (0, "Critical — foundational concerns unresolved"),
 ]
+RISK_BANDS = [(80, "Low"), (55, "Medium"), (30, "High"), (0, "Critical")]
+
+# --- INDICATOR PHILOSOPHY ---
+# A single 0-100 score conflates "are the docs accurate" with "is the architecture good" — a repo
+# can improve one and regress the other and one number can't say which. Four indicators separate
+# these concerns instead of blending them; the legacy Debt index (compute_score, unchanged) is
+# kept as a fifth, explicitly secondary figure so scores already published against this skill
+# (before this schema existed) stay comparable, not invalidated.
+#   Documentation fidelity — reconciliation pass only (confirmed / misaligned / gap). "Not run" if
+#     the report has no reconciliation findings at all (evaluate-mode run).
+#   Architecture risk — evaluation pass only (dimension != correctness), same capped weighted-
+#     penalty mechanics as the legacy score, banded to Low/Medium/High/Critical. "Not run" if the
+#     report has no evaluation-pass findings (reconcile-mode run).
+#   Audit coverage — checks.json entries with a non-"not-assessed" status, divided by how many
+#     checks scripts/rubric_manifest.json marks mandatory for this repo's classified system_type
+#     (context.json). "Not run" without both --checks and --context supplied — never a fabricated
+#     0%, since a missing input isn't the same claim as "zero checks were covered."
+#   Evidence confidence — % of findings carrying confidence:"high", among findings that state a
+#     confidence at all. "Not specified" if no finding in the report states one (true for every
+#     report generated before this field existed).
 
 
 def load(path):
@@ -113,6 +142,15 @@ def load(path):
         return None
     with open(path) as fh:
         return json.load(fh)
+
+
+def load_manifest():
+    manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rubric_manifest.json")
+    try:
+        with open(manifest_path) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return None
 
 
 def s(d, key, default=""):
@@ -123,44 +161,171 @@ def s(d, key, default=""):
     return val if val is not None else default
 
 
-def compute_score(findings):
+def _capped_penalty(findings_subset):
     penalty_by_dim = {}
-    for f in findings:
-        if f.get("classification") in ("risk", "misaligned", "gap"):
-            dim = s(f, "dimension", "correctness")
-            penalty_by_dim[dim] = penalty_by_dim.get(dim, 0) + SCORE_WEIGHTS.get(s(f, "severity", "info"), 0)
-    penalty = sum(min(p, DIMENSION_PENALTY_CAP) for p in penalty_by_dim.values())
+    for f in findings_subset:
+        dim = s(f, "dimension", "correctness")
+        penalty_by_dim[dim] = penalty_by_dim.get(dim, 0) + SCORE_WEIGHTS.get(s(f, "severity", "info"), 0)
+    return sum(min(p, DIMENSION_PENALTY_CAP) for p in penalty_by_dim.values())
+
+
+def compute_score(findings):
+    """Legacy 0-100 debt index — unchanged formula, kept as the secondary indicator."""
+    penalty = _capped_penalty([f for f in findings if f.get("classification") in ("risk", "misaligned", "gap")])
     bonus = min(STRENGTH_BONUS_CAP, STRENGTH_BONUS_PER * sum(1 for f in findings if f.get("classification") == "strength"))
     score = max(0, min(100, 100 - penalty + bonus))
     label = next(lbl for threshold, lbl in SCORE_BANDS if score >= threshold)
     return score, label, penalty, bonus
 
 
-def build_score_card(findings):
-    score, label, penalty, bonus = compute_score(findings)
+def compute_doc_fidelity(findings):
+    recon = [f for f in findings if f.get("classification") in ("confirmed", "misaligned", "gap")]
+    if not recon:
+        return None
+    confirmed = sum(1 for f in recon if f.get("classification") == "confirmed")
+    return round(100 * confirmed / len(recon)), len(recon)
+
+
+def compute_architecture_risk(findings):
+    eval_findings = [f for f in findings if s(f, "dimension", "correctness") != "correctness"]
+    if not eval_findings:
+        return None
+    penalty = _capped_penalty([f for f in eval_findings if f.get("classification") == "risk"])
+    bonus = min(STRENGTH_BONUS_CAP, STRENGTH_BONUS_PER * sum(1 for f in eval_findings if f.get("classification") == "strength"))
+    score = max(0, min(100, 100 - penalty + bonus))
+    label = next(lbl for threshold, lbl in RISK_BANDS if score >= threshold)
+    return label, score
+
+
+def compute_audit_coverage(checks_doc, context_doc, manifest):
+    if not checks_doc or not context_doc or not manifest:
+        return None
+    system_type = s(context_doc, "system_type", "production-service")
+    overrides = manifest.get("system_type_overrides", {}).get(system_type, {})
+    mandatory_ids = set()
+    for dim, dim_def in manifest.get("dimensions", {}).items():
+        if overrides.get(dim) in ("informational", "not-applicable"):
+            continue
+        for chk in dim_def.get("checks", []):
+            mandatory_ids.add(chk["id"])
+    if not mandatory_ids:
+        return None
+    by_id = {c.get("id"): c for c in checks_doc.get("checks", [])}
+    completed = sum(1 for cid in mandatory_ids if by_id.get(cid, {}).get("status") not in (None, "not-assessed"))
+    return round(100 * completed / len(mandatory_ids)), completed, len(mandatory_ids)
+
+
+def compute_evidence_confidence(findings):
+    rated = [f for f in findings if f.get("confidence")]
+    if not rated:
+        return None
+    high = sum(1 for f in rated if f.get("confidence") == "high")
+    return round(100 * high / len(rated)), len(rated)
+
+
+def _indicator_block(label, value_html, detail_html, tone_class=""):
     return f"""
+      <div class="indicator {tone_class}">
+        <div class="indicator-value">{value_html}</div>
+        <div class="indicator-label">{html.escape(label)}</div>
+        <div class="indicator-detail muted">{detail_html}</div>
+      </div>
+    """
+
+
+def build_indicators(findings, checks_doc, context_doc, manifest):
+    doc_fidelity = compute_doc_fidelity(findings)
+    arch_risk = compute_architecture_risk(findings)
+    coverage = compute_audit_coverage(checks_doc, context_doc, manifest)
+    confidence = compute_evidence_confidence(findings)
+    score, label, penalty, bonus = compute_score(findings)
+
+    blocks = [
+        _indicator_block(
+            "Documentation fidelity",
+            f"{doc_fidelity[0]}%" if doc_fidelity else "—",
+            f"{doc_fidelity[1]} reconciliation findings" if doc_fidelity else "Not run in this mode",
+        ),
+        _indicator_block(
+            "Architecture risk",
+            html.escape(arch_risk[0]) if arch_risk else "—",
+            f"risk index {arch_risk[1]}/100" if arch_risk else "Not run in this mode",
+        ),
+        _indicator_block(
+            "Audit coverage",
+            f"{coverage[0]}%" if coverage else "—",
+            f"{coverage[1]}/{coverage[2]} mandatory checks" if coverage else "checks.json/context.json not supplied",
+        ),
+        _indicator_block(
+            "Evidence confidence",
+            f"{confidence[0]}%" if confidence else "—",
+            f"high-confidence, of {confidence[1]} rated" if confidence else "Not specified on these findings",
+        ),
+    ]
+
+    return f"""
+    <div class="indicator-bar">
+      {"".join(blocks)}
+    </div>
     <div class="score-card">
       <div class="score-number">{score}<span class="score-max">/100</span></div>
-      <div class="score-label">{html.escape(label)}</div>
+      <div class="score-label">Debt index (secondary) — {html.escape(label)}</div>
       <div class="score-math muted">-{penalty} debt penalty, +{bonus} strength credit</div>
       <details class="score-philosophy">
-        <summary>Score philosophy — read before treating this as a grade</summary>
-        <p>Heuristic, debt-weighted signal, not a certified quality score. Only <b>risk</b>,
-        <b>misaligned</b>, and <b>gap</b> findings count against it, weighted by severity
-        (high=6, medium=3, low=1, info=0) and summed <b>per dimension, each dimension capped at
-        15</b> before those capped totals are added together — <b>confirmed</b> findings are the
-        expected baseline and don't move it; <b>strength</b> findings give a small capped bonus
-        (+1 each, max +5) without buying back debt found elsewhere. The per-dimension cap exists so
-        one unusually issue-rich dimension can't swing the whole score on its own — score
-        differences should track breadth of concern across the system, not which single area
-        happened to turn up the most.</p>
-        <p><b>Known limitations:</b> deeper review surfaces more findings, so this number isn't
-        comparable across repos or across runs at different scope/depth — use it to track one
-        repo's trend as issues get fixed, not to rank systems against each other. Findings aren't
-        independent (several here share one root cause and are still penalized separately). It
-        reflects severity as judged during this review, not business impact or likelihood.</p>
+        <summary>Indicator &amp; score philosophy — read before treating any of this as a grade</summary>
+        <p><b>The four indicators above separate two different questions</b> this skill used to
+        blend into one number: whether the <i>docs</i> are accurate (Documentation fidelity) is a
+        different axis from whether the <i>architecture</i> is sound (Architecture risk) — a repo
+        can improve one and regress the other. Audit coverage says how much of the mandatory
+        checklist actually got run (not how many problems were found); Evidence confidence says how
+        much of what's reported rests on direct citation versus inference. A dash (—) means that
+        indicator legitimately wasn't computed for this run (wrong mode, or an older report
+        predating that field) — never a fabricated zero.</p>
+        <p><b>Debt index</b> (secondary, 0-100) is the original heuristic, debt-weighted signal,
+        kept for continuity with earlier reports. Only <b>risk</b>, <b>misaligned</b>, and
+        <b>gap</b> findings count against it, weighted by severity (high=6, medium=3, low=1,
+        info=0) and summed per dimension, each dimension capped at 15, before those capped totals
+        are added together; <b>strength</b> findings give a small capped bonus (+1 each, max +5).
+        Deeper review surfaces more findings, so it isn't comparable across repos or across runs at
+        different scope/depth — use it to track one repo's trend, not to rank systems against each
+        other. Findings aren't independent (several may share one root cause and still get
+        penalized separately). It reflects severity as judged during this review, not business
+        impact or likelihood.</p>
       </details>
     </div>
+    """
+
+
+def build_check_coverage(checks_doc, context_doc, manifest):
+    if not checks_doc or not manifest:
+        return None
+    by_id = {c.get("id"): c for c in checks_doc.get("checks", [])}
+    system_type = s(context_doc or {}, "system_type", "production-service")
+    overrides = manifest.get("system_type_overrides", {}).get(system_type, {})
+
+    status_counts = {"risk": 0, "strength": 0, "clean": 0, "not-applicable": 0, "not-assessed": 0}
+    mandatory_total = 0
+    for dim, dim_def in manifest.get("dimensions", {}).items():
+        applicability = overrides.get(dim, "mandatory")
+        for chk in dim_def.get("checks", []):
+            rec = by_id.get(chk["id"])
+            status = rec.get("status") if rec else "not-assessed"
+            status_counts[status] = status_counts.get(status, 0) + 1
+            if applicability == "mandatory":
+                mandatory_total += 1
+
+    summary = " · ".join(f"{v} {k}" for k, v in status_counts.items() if v)
+    informational = [k for k, v in overrides.items() if v != "mandatory"]
+    context_note = (
+        f"System type: <b>{html.escape(system_type)}</b>"
+        + (f" (informational dimensions: {html.escape(', '.join(informational))})" if informational else "")
+    ) if context_doc else "No context.json supplied — assumed production-service for display only."
+
+    return f"""
+        <div class="insight-block">
+          <div class="insight-stats">{mandatory_total} mandatory checks · {html.escape(summary)}</div>
+          <div class="insight-stats">{context_note}</div>
+        </div>
     """
 
 
@@ -313,6 +478,12 @@ TEMPLATE = """<!doctype html>
   .stat.gap {{ border-left: 4px solid #d97706; }}
   .stat.risk {{ border-left: 4px solid #a855f7; }}
   .stat.strength {{ border-left: 4px solid #0ea5e9; }}
+  .indicator-bar {{ margin: 0 32px 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                     gap: 12px; }}
+  .indicator {{ padding: 14px 16px; border-radius: 12px; background: #111827; border: 1px solid #1e293b; }}
+  .indicator-value {{ font-size: 24px; font-weight: 700; color: #e2e8f0; }}
+  .indicator-label {{ font-size: 12px; color: #cbd5e1; margin-top: 2px; }}
+  .indicator-detail {{ font-size: 11px; margin-top: 4px; }}
   .score-card {{ margin: 0 32px 16px; padding: 16px 20px; border-radius: 12px; background: #111827;
                  border: 1px solid #1e293b; display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }}
   .score-number {{ font-size: 36px; font-weight: 700; color: #e2e8f0; }}
@@ -373,7 +544,7 @@ TEMPLATE = """<!doctype html>
   <h1>{title}</h1>
   <div class="subtitle">Doc sources: {doc_sources}</div>
 </header>
-{score_card}
+{indicators}
 <div class="summary">
   <div class="stat confirmed"><b>{n_confirmed}</b>Confirmed</div>
   <div class="stat misaligned"><b>{n_misaligned}</b>Misaligned</div>
@@ -414,6 +585,7 @@ TEMPLATE = """<!doctype html>
       <div class="panel-title">Static code analysis</div>
       {static_analysis}
     </div>
+    {check_coverage_panel}
   </div>
   <div class="table-panel">
     <table>
@@ -464,14 +636,19 @@ TEMPLATE = """<!doctype html>
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--findings", required=True)
+    ap.add_argument("--checks", default=None)
+    ap.add_argument("--context", default=None)
     ap.add_argument("--dep-graph", default=None)
     ap.add_argument("--churn", default=None)
     ap.add_argument("--out", default="report.html")
     args = ap.parse_args()
 
     findings_doc = load(args.findings)
+    checks_doc = load(args.checks)
+    context_doc = load(args.context)
     dep_graph = load(args.dep_graph)
     churn = load(args.churn)
+    manifest = load_manifest()
 
     findings = findings_doc.get("findings", [])
     title = s(findings_doc, "title", "Architecture Debt Visualizer Report")
@@ -483,24 +660,33 @@ def main():
         if cls in counts:
             counts[cls] += 1
 
+    static_analysis_parts = [build_static_analysis(dep_graph, churn)]
+    check_coverage_panel = build_check_coverage(checks_doc, context_doc, manifest)
+
     html_out = TEMPLATE.format(
         title=html.escape(title),
         doc_sources=html.escape(doc_sources),
-        score_card=build_score_card(findings),
+        indicators=build_indicators(findings, checks_doc, context_doc, manifest),
         n_confirmed=counts["confirmed"],
         n_misaligned=counts["misaligned"],
         n_gap=counts["gap"],
         n_risk=counts["risk"],
         n_strength=counts["strength"],
         key_findings=build_key_findings(findings),
-        static_analysis=build_static_analysis(dep_graph, churn),
+        static_analysis="".join(static_analysis_parts),
+        check_coverage_panel=(
+            f'<div class="panel-card"><div class="panel-title">Check coverage</div>{check_coverage_panel}</div>'
+            if check_coverage_panel else ""
+        ),
         findings_rows=build_findings_table(findings),
     )
 
     with open(args.out, "w") as fh:
         fh.write(html_out)
     score, label, _, _ = compute_score(findings)
-    print(f"Wrote {args.out} ({len(findings)} findings, score {score}/100 — {label})")
+    coverage = compute_audit_coverage(checks_doc, context_doc, manifest)
+    coverage_msg = f", audit coverage {coverage[0]}%" if coverage else ""
+    print(f"Wrote {args.out} ({len(findings)} findings, debt index {score}/100 — {label}{coverage_msg})")
 
 
 if __name__ == "__main__":
