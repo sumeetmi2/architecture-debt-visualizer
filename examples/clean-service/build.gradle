@@ -1,0 +1,15 @@
+// Illustrative only — not a buildable project. Exists so this fixture reads like a real
+// Quarkus/Gradle service; there is nothing to compile or run here.
+plugins {
+    id 'java'
+    id 'io.quarkus'
+}
+
+dependencies {
+    implementation 'io.quarkus:quarkus-resteasy-reactive-jackson'
+    implementation 'io.quarkus:quarkus-hibernate-validator'
+    implementation 'io.quarkus:quarkus-smallrye-reactive-messaging-kafka'
+    implementation 'io.quarkus:quarkus-smallrye-fault-tolerance'
+    implementation 'io.quarkus:quarkus-micrometer-registry-prometheus'
+    implementation 'io.quarkus:quarkus-scheduler'
+}

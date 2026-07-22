@@ -1,0 +1,20 @@
+CREATE TABLE Link (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  createdDate DATE NOT NULL,
+  shortCode VARCHAR(12) NOT NULL,
+  targetUrl VARCHAR(2048) NOT NULL,
+  idempotencyKey VARCHAR(64) NOT NULL,
+  clickCount BIGINT NOT NULL DEFAULT 0,
+  expiresAt DATETIME NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  createdAt DATETIME NOT NULL,
+  PRIMARY KEY (createdDate, id)
+) PARTITION BY RANGE COLUMNS(createdDate) (
+  PARTITION p2026 VALUES LESS THAN ('2027-01-01'),
+  PARTITION p2027 VALUES LESS THAN ('2028-01-01'),
+  PARTITION pmax VALUES LESS THAN (MAXVALUE)
+);
+
+CREATE UNIQUE INDEX IdxShortCode ON Link (shortCode);
+CREATE UNIQUE INDEX IdxIdempotencyKey ON Link (idempotencyKey);
+CREATE INDEX IdxExpiresAt ON Link (expiresAt, status);

@@ -1,0 +1,135 @@
+{
+  "prefix": "com.example.linkshortener",
+  "nodes": [
+    {
+      "id": "com.example.linkshortener.client",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.consumer",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.entity",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.repository",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.resource",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.scheduler",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.security",
+      "class_count": 1
+    },
+    {
+      "id": "com.example.linkshortener.service",
+      "class_count": 1
+    }
+  ],
+  "edges": [
+    {
+      "from": "com.example.linkshortener.consumer",
+      "to": "com.example.linkshortener.client",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java",
+          "line": 3,
+          "imported_class": "com.example.linkshortener.client.AnalyticsClient"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.consumer",
+      "to": "com.example.linkshortener.service",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java",
+          "line": 4,
+          "imported_class": "com.example.linkshortener.service.LinkService"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.repository",
+      "to": "com.example.linkshortener.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/repository/LinkRepository.java",
+          "line": 3,
+          "imported_class": "com.example.linkshortener.entity.Link"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.resource",
+      "to": "com.example.linkshortener.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/resource/LinkResource.java",
+          "line": 3,
+          "imported_class": "com.example.linkshortener.entity.Link"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.resource",
+      "to": "com.example.linkshortener.service",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/resource/LinkResource.java",
+          "line": 4,
+          "imported_class": "com.example.linkshortener.service.LinkService"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.scheduler",
+      "to": "com.example.linkshortener.repository",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/scheduler/LinkExpiryJob.java",
+          "line": 3,
+          "imported_class": "com.example.linkshortener.repository.LinkRepository"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.service",
+      "to": "com.example.linkshortener.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/service/LinkService.java",
+          "line": 3,
+          "imported_class": "com.example.linkshortener.entity.Link"
+        }
+      ]
+    },
+    {
+      "from": "com.example.linkshortener.service",
+      "to": "com.example.linkshortener.repository",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/clean-service/src/main/java/com/example/linkshortener/service/LinkService.java",
+          "line": 4,
+          "imported_class": "com.example.linkshortener.repository.LinkRepository"
+        }
+      ]
+    }
+  ]
+}
