@@ -55,8 +55,18 @@ Write `context.json` in the run directory:
   same disclaimer.
 - `criticality` — free text, e.g. `financially-critical`, `internal-tooling`, `customer-facing`,
   `low-stakes`. Informational, not used for applicability gating today.
-- `lifecycle` — `active`, `maintenance`, or `archived` (redundant with `system_type: archived` in
-  the common case, but a repo can be `production-service` + `maintenance`).
+- `lifecycle` — `active`, `maintenance`, or `archived`. **This is the precise, primary signal for
+  where a repo is in its life; `system_type: prototype`/`archived` are convenience shorthand for
+  the common case where architectural shape and lifecycle point the same direction, not a second,
+  competing source of truth.** A second external review correctly flagged that folding lifecycle
+  concepts into `system_type` muddles two different questions (what shape is this vs. where is it
+  in its life) — a repo can genuinely be `production-service` + `lifecycle: archived` (a real
+  deployed service shape that's since been frozen) or `production-service` + `lifecycle: maintenance`
+  (still shaped like a production service, no longer under active feature development). When
+  `system_type` and `lifecycle` would point to different overrides, `lifecycle` is informational
+  today (not yet wired into `rubric_manifest.json`'s applicability gating — that still keys off
+  `system_type` alone) but should still be recorded honestly; don't force `system_type: archived`
+  just to make the two fields agree.
 - `deployment_model` — `multi-instance-service`, `single-instance`, `serverless`, `library-consumed`,
   `not-deployed` (prototype/library).
 - `data_sensitivity` — `financial`, `pii`, `internal-only`, `none`/`unknown`. Informational.
