@@ -12,6 +12,18 @@
   next year (task-assigned, task-overdue, task-escalated are the named candidates) and wants each
   addition to take under a day of engineering time given the existing pattern.
 
+## Versioning & Deprecation Policy
+
+- **REST endpoints** are unversioned today (no `/v1/` prefix) — acceptable at current scale (a
+  handful of internal callers, tracked in `boundaries.md`), but the team has agreed to add path
+  versioning before the first external/partner consumer, not after.
+- **Message channels**: a channel is never repurposed once it has a consumer — a semantic change
+  ships as a new channel name instead, and the old one is drained and removed after confirming zero
+  producers/consumers reference it (checked via the same reconciliation this skill performs).
+- **Removing a channel or endpoint**: mark it `@Deprecated` in code and note the removal target date
+  here in this doc; actual removal is a separate, reviewed change, not a silent deletion. No formal
+  deprecation has happened yet — this is the policy for when one does, not a retrospective claim.
+
 ## Design Philosophy
 
 The tasks service favors availability over strict delivery guarantees on its message channels: a

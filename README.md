@@ -59,7 +59,9 @@ made a difference across testing, not a generic "write good docs" checklist.
 
 - `architecture.md` — module/component topology, data flow, entry points.
 - `boundaries.md` — every REST endpoint, queue/topic, cron job, external API and datastore this
-  component touches. This is the single highest-value doc for the reconciliation pass.
+  component touches. This is the single highest-value doc for the reconciliation pass, and — along
+  with `conventions.md` — is where your **functional requirements** actually live: what the system
+  does and the rules it follows, as opposed to the non-functional targets below.
 - `data-model.md` — entities, keys, invariants. Point it at the real schema/DDL, not just at ORM
   classes — the skill checks both and the two disagreeing is one of its most common findings.
 - `conventions.md` — naming, layering, testing, and error-handling conventions actually in force.
@@ -93,13 +95,27 @@ on — lets the evaluation pass check whether your current architecture is actua
 instead of only judging against today's usage. Some of the most valuable findings in testing came
 from checking a design against a stated future requirement, not its current one.
 
-**State your actual scale and throughput targets somewhere, even roughly.** "We expect X requests/
-second at peak, Y% growth over the next N months, and a Z-ms latency budget" turns every scalability
-finding from a guess into a calibrated judgment — the same hardcoded worker count is a non-issue
-against a low target and a real problem against a high one, and the skill can't tell which without
-a number to check against. If this is missing, the skill flags the absence itself as a finding
-rather than silently guessing; put the number in and every downstream scalability/performance
-finding gets sharper for it.
+**State your actual scale and throughput targets somewhere, even roughly** — this is what the
+`scale-requirements` dimension checks for. "We expect X requests/second at peak, Y% growth over the
+next N months, and a Z-ms latency budget" turns every scalability finding from a guess into a
+calibrated judgment — the same hardcoded worker count is a non-issue against a low target and a real
+problem against a high one, and the skill can't tell which without a number to check against. If
+this is missing, the skill flags the absence itself as a finding rather than silently guessing; put
+the number in and every downstream scalability/performance finding gets sharper for it.
+
+**Separately, state your extensibility targets** — this is what the `extensibility-requirements`
+dimension checks for, and it's a different question from scale. Name the things you expect to add
+and roughly how fast: a new integration type, a new tenant class, a new channel — "one new message
+channel per quarter" is the kind of concrete figure that lets the skill judge whether today's
+pattern (a `patterns/add-*.md` guide, a plugin point, a config-driven registry) can actually keep up,
+instead of just noting that extension points exist.
+
+**Name what "evolving" means for things that already exist, not just what's coming next.** A short
+note on versioning/deprecation policy — how a breaking API or schema change gets rolled out, how long
+an old consumer or endpoint stays supported, what "retired" looks like in practice — closes the loop
+on extensibility: it's not just "can we add new things" but "can we retire or change old ones without
+an incident." Repos that only document growth and never document deprecation tend to accumulate
+exactly the kind of dead/duplicate code paths this skill flags as maintainability debt.
 
 **If you keep diagrams, prefer a text format (Mermaid) as the source of truth**, and if you also
 keep a frozen image export (PNG/SVG) alongside it, say explicitly which one wins if they disagree.
