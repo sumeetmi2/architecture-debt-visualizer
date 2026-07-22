@@ -1,0 +1,4 @@
+// Illustrative only — this sample is source for the skill to analyze, not a buildable project.
+// No dependencies are declared; there's nothing to compile or run here.
+group 'com.example.tasks'
+version '1.0.0'
