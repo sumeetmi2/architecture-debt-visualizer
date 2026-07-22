@@ -13,10 +13,11 @@ Inputs (all JSON):
           "doc_source": "docs/boundaries.md",
           "doc_location": "line 74 / heading name",
           "classification": "confirmed" | "misaligned" | "gap" | "risk" | "strength",
-          "dimension": "correctness" | "scalability" | "extensibility" | "maintainability" |
-                       "performance-cost" | "data-architecture" | "observability" | "vision-alignment",
+          "dimension": "correctness" | "scale-requirements" | "extensibility-requirements" |
+                       "scalability" | "extensibility" | "maintainability" | "performance-cost" |
+                       "data-architecture" | "observability" | "vision-alignment",
           "severity": "info" | "low" | "medium" | "high",
-          "packages": ["com.codapayments.pricing.engine.consumer"],
+          "packages": ["com.example.app.consumer"],
           "evidence": [{"file": "path", "line": 42, "note": "why this supports/contradicts the claim"}],
           "explanation": "grounded narrative, cites evidence",
           "recommendation": "optional: what an architect would actually do about it"
@@ -60,6 +61,8 @@ CLASS_LABEL = {
 }
 DIMENSION_LABEL = {
     "correctness": "Correctness",
+    "scale-requirements": "Scale Requirements",
+    "extensibility-requirements": "Extensibility Requirements",
     "scalability": "Scalability",
     "extensibility": "Extensibility",
     "maintainability": "Maintainability",
@@ -391,6 +394,8 @@ TEMPLATE = """<!doctype html>
   <span class="group-label">Dimension</span>
   <button class="active" data-filter-group="dim" data-filter="all">All</button>
   <button data-filter-group="dim" data-filter="correctness">Correctness</button>
+  <button data-filter-group="dim" data-filter="scale-requirements">Scale Requirements</button>
+  <button data-filter-group="dim" data-filter="extensibility-requirements">Extensibility Requirements</button>
   <button data-filter-group="dim" data-filter="scalability">Scalability</button>
   <button data-filter-group="dim" data-filter="extensibility">Extensibility</button>
   <button data-filter-group="dim" data-filter="maintainability">Maintainability</button>

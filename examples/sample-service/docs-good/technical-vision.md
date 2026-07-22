@@ -1,5 +1,17 @@
 # Technical Vision
 
+## Scale & Extensibility Targets
+
+- **Target load**: 200 requests/second peak across all three HTTP endpoints combined; 50
+  messages/second sustained on each of `task-events` and `task-reminders`. Expected growth: 3x
+  within 12 months as the reminder feature rolls out to all users, not just the current beta cohort.
+- **Latency budget**: p99 under 300ms for the synchronous REST endpoints; no hard SLA on message
+  processing latency today (deliberately — see the drop-on-failure tradeoff below), but a 5-second
+  p99 is the informal internal expectation.
+- **Extensibility target**: the team expects to add one new message channel per quarter for the
+  next year (task-assigned, task-overdue, task-escalated are the named candidates) and wants each
+  addition to take under a day of engineering time given the existing pattern.
+
 ## Design Philosophy
 
 The tasks service favors availability over strict delivery guarantees on its message channels: a

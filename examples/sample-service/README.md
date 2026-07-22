@@ -28,6 +28,8 @@ Planted issues, for reference (see inline comments in the source for exactly whe
 | Partition list has a hardcoded horizon, no maintenance job | `sql/001-task.sql` | data-architecture / scalability |
 | Hardcoded, non-overridable worker count | `application.properties` | scalability |
 | Empty vision doc (`docs-bad` only) | `docs-bad/technical-vision.md` | vision-alignment |
+| No stated QPS/latency/growth target (`docs-bad` only — `docs-good` states one, so the same hardcoded worker count gets judged against a real number instead of a guess) | `docs-good/technical-vision.md` "Scale & Extensibility Targets" section, absent from `docs-bad` | scale-requirements |
+| No stated future-channel timeline (`docs-bad` only) | same section, absent from `docs-bad` | extensibility-requirements |
 
 This is intentionally small (~10 files) so a cold run stays fast, not a realistic-scale production
 codebase — treat the specific finding *count* as illustrative, not as a benchmark for what a real

@@ -37,6 +37,27 @@ system they're about to inherit would — not "does this technically work" but "
 a good decision in two years, at 10x the data, with a bigger team touching it." Concretely, for
 every significant component/pattern/decision you encounter, ask:
 
+- **Scale requirements — check this before judging scalability, not after.** A hardcoded
+  `concurrency=1` is a completely different finding at 50 QPS than at 5,000 QPS, and you can't tell
+  which without knowing the target. Search the docs for anything stating target
+  throughput/QPS/TPS, a latency or response-time SLO, an expected growth horizon ("10x users by
+  2027"), or peak-vs-average load characteristics. **If none of this is documented anywhere, that
+  absence is itself a finding** (dimension `scale-requirements`) — and it means every scalability
+  judgment you make elsewhere in this pass is necessarily uncalibrated; say so explicitly rather
+  than asserting a confident severity you can't actually justify ("no stated throughput target
+  exists, so this hardcoded value's real risk can't be precisely sized — recommend the team state
+  one" is itself the finding). If a target *is* documented, carry it forward and cite the actual
+  number in your scalability/performance-cost findings later — "stated target is X QPS; current
+  hardcoded concurrency=1 caps throughput well below that" is a sharper, more useful finding than
+  "this is hardcoded, no override."
+- **Extensibility requirements — same principle, checked first.** Before judging whether the
+  codebase's actual extensibility is good or bad, find out what the docs say it actually needs to
+  extend to: named future tenants/integrations/use cases, and any stated bar for how fast a new one
+  should be addable ("a new region should be onboardable in under a sprint"). Absence of this is
+  itself a finding (dimension `extensibility-requirements`). When present, judge the codebase's
+  extension points against that concrete target, not a generic "is this well factored" standard —
+  and when you get to the **Extensibility** and **Data architecture** bullets below, reference
+  whatever you found here rather than treating them as unrelated passes.
 - **Scalability** — what's the ceiling? Fixed thread/worker/concurrency counts, single-instance
   assumptions, hardcoded horizons (a date range, a partition list, a capacity number), anything
   that degrades silently rather than failing loudly as load grows. "Works fine today" is not the
@@ -289,13 +310,15 @@ scope produced anywhere from 11 to 28 total findings, because "thorough" was lef
 judgment about when to stop. Replace that judgment call with a fixed rubric, applied identically
 every time:
 
-**For each of the 7 dimensions below: produce a minimum of 2 evaluation findings, and a maximum
+**For each of the 9 dimensions below: produce a minimum of 2 evaluation findings, and a maximum
 equal to that dimension's number of lettered mandatory sub-checks (never fewer than 5 even if a
 dimension has fewer lettered items) — then move to the next dimension.** Data-architecture has 7
-lettered sub-checks below, so its cap is 6, not 5 — **do not combine two lettered sub-checks into
-one finding to fit a smaller cap; that has already happened once and silently dropped a real
-finding (a tenant-readiness check got merged away because 6 items didn't fit a 5-slot cap — now 7
-lettered items, cap raised to match).** Every
+lettered sub-checks below, so its cap is 7, not 5; scale-requirements and extensibility-requirements
+each have fewer than 5 lettered items, so they still get the 5-item floor cap. **Do not combine two
+lettered sub-checks into one finding to fit a smaller cap; that has already happened once and
+silently dropped a real finding (a tenant-readiness check got merged away because 6 items didn't
+fit a 5-slot cap — data-architecture's cap was raised to match its actual lettered-item count as a
+result).** Every
 lettered sub-check gets its own finding-or-explicitly-noted-clean-result, full stop — the cap
 exists to bound *extra* digging beyond the mandatory items, never to force the mandatory items
 to share slots. Concretely:
@@ -309,13 +332,13 @@ to share slots. Concretely:
   the mandatory lettered ones. Log the most significant extras (by severity, then by how central
   the affected code is) up to the cap, and note in your summary that this dimension had more
   findings available than the cap — don't let one target-rich dimension consume the time budget the
-  other 6 dimensions need. This ceiling exists specifically to narrow run-to-run variance: a run
+  other 8 dimensions need. This ceiling exists specifically to narrow run-to-run variance: a run
   that happens to notice `data-architecture` is unusually rich in issues should not produce 3x the
-  findings of a run that spends proportionate time across all 7 — but the cap bounds *extra* depth,
+  findings of a run that spends proportionate time across all 9 — but the cap bounds *extra* depth,
   it never shrinks below the dimension's mandatory lettered-item count.
 
-This yields a **predictable total band of roughly 14-36 evaluation findings** (2 minimum ×
-7 dimensions, up to each dimension's lettered-item cap — 7 for data-architecture, 5 for the rest)
+This yields a **predictable total band of roughly 18-47 evaluation findings** (2 minimum ×
+9 dimensions, up to each dimension's lettered-item cap — 7 for data-architecture, 5 for the rest)
 regardless of run, replacing the much wider variance an open-ended target produced. This rubric is
 scope-independent — it applies whether you're reconciling against 3 docs or 30, because most of
 what drives evaluation-pass findings is *code and config investigation*, not how many docs you
@@ -351,13 +374,29 @@ not skip a lettered item to spend its budget on a second finding from an item yo
 If a dimension's cap (5) is smaller than its lettered-item count, prioritize breadth (touch every
 letter once) over depth (multiple findings from one letter) unless one letter is clearly empty.
 
-1. **Vision alignment**: 
+1. **Scale requirements** (do this one first — its output calibrates item 5, Scalability &
+   performance/cost, below):
+   (a) search all docs for a stated target throughput/QPS/TPS or latency/response-time SLO — absent
+   is a `risk` finding on its own;
+   (b) search for a stated growth horizon or expected-scale-in-N-years figure — absent is a second,
+   distinct finding, not a duplicate of (a);
+   (c) whatever you find (or its absence) here, carry it forward explicitly into the Scalability and
+   Performance/cost checks later — cite the actual number if one exists, or note explicitly that a
+   given finding's severity couldn't be precisely calibrated because no target was documented.
+2. **Extensibility requirements** (also do this first — calibrates item 6, Extensibility &
+   maintainability, below):
+   (a) search docs for named future tenants/integrations/use cases the system must support, and any
+   stated timeline — absent is a `risk` finding;
+   (b) search for a stated bar on how fast/cheaply a new instance of the system's core extension
+   point must be addable (e.g. "a new region in under a sprint") — if found, carry it into the
+   Extensibility check later and judge actual extension cost against it directly.
+3. **Vision alignment**: 
    (a) find and read the vision/strategy doc(s) — empty/missing is a `risk` finding on its own, but
    that's one letter, not the whole dimension;
    (b) check 2-3 *concrete, currently in-flight or recently-made* architecture decisions (grep
    recent git history / open feature flags / disabled-by-default code for what's actively being
    worked on) against what the vision claims or should claim, and note agreement or drift.
-2. **Data architecture** — open the actual schema/DDL/migration files directly, not a doc's
+4. **Data architecture** — open the actual schema/DDL/migration files directly, not a doc's
    description of them, for every table connected to the domain's core write-heavy entities:
    (a) identity/PK consistency — does the ORM's `@Id` match the real DDL key?;
    (b) normalization/naming — count the columns; if there are many, categorize them (clusters of
@@ -380,7 +419,7 @@ letter once) over depth (multiple findings from one letter) unless one letter is
    normalization or type-choice review.
    Data-architecture's cap is 7, matching these 7 lettered items — do not combine any two into one
    finding to save room.
-3. **Scalability & performance/cost**:
+5. **Scalability & performance/cost**:
    (a) grep config files for *every* hardcoded capacity number (thread/worker/concurrency counts,
    timeouts, batch sizes, partition/date horizons) — don't stop after finding one; list them,
    compare which are env-overridable vs. literal, note which sit on the highest-traffic path;
@@ -388,7 +427,7 @@ letter once) over depth (multiple findings from one letter) unless one letter is
    scales with data scanned), check for a cost/rate guardrail, and compare it against how a
    *similar* endpoint elsewhere in the same codebase is guarded — an inconsistency between two
    structurally similar endpoints is a stronger finding than "there's no rate limit" in isolation.
-4. **Extensibility & maintainability**:
+6. **Extensibility & maintainability**:
    (a) use the repo's own "how to add X" pattern docs (if any) as a test — do the described steps
    still match reality, and how many actual instances of "X" follow the pattern vs. duplicate logic
    inline? Get the exact count (`grep -c` / `grep -l | wc -l`), don't estimate;
@@ -396,7 +435,7 @@ letter once) over depth (multiple findings from one letter) unless one letter is
    conceptually-identical concerns modeled two structurally different ways elsewhere in the codebase
    is the same finding pattern, just undocumented — actively look for at least one of these beyond
    whatever (a) already covered.
-5. **Observability**:
+7. **Observability**:
    (a) pick the 2-3 most critical logic paths (highest business impact and/or highest churn — use
    the churn/dep-graph output from step 3, don't guess) and check all four golden signals for each,
    *separately* — explicitly note which of traffic/errors/latency/saturation you found evidence for
@@ -406,7 +445,7 @@ letter once) over depth (multiple findings from one letter) unless one letter is
    completeness check) all the way to its output, and check whether that output is a metric
    (gauge/counter you could alert on) or just a log line — this single check has reliably produced
    the highest-value observability finding in past runs; do it every time, not opportunistically.
-6. **Maintainability / contributor concentration**:
+8. **Maintainability / contributor concentration**:
    (a) use `compute_churn.py`'s `bus_factor_hotspots` and `high_diversity_hotspots` output (already
    computed in step 3 — don't skip re-checking it here) — for any single-author high-churn package,
    cross-reference it against what that code actually does; bus-factor risk on routine CRUD is
@@ -432,8 +471,9 @@ finding in past runs of this skill. Do this check whenever a doc names a specifi
 
 Classify each evaluation-pass finding as `risk` (a concern, no accompanying doc claim to be
 "misaligned" against) or `strength` (a decision worth crediting), tag it with a `dimension`
-(`scalability` / `extensibility` / `maintainability` / `performance-cost` / `data-architecture` /
-`observability` / `vision-alignment`) and a `severity` (`info` / `low` / `medium` / `high`), and —
+(`scale-requirements` / `extensibility-requirements` / `scalability` / `extensibility` /
+`maintainability` / `performance-cost` / `data-architecture` / `observability` /
+`vision-alignment`) and a `severity` (`info` / `low` / `medium` / `high`), and —
 for anything `medium` or higher — write a one- or two-sentence `recommendation`: what an architect
 would actually tell the team to do about it. Not "this is a risk" — "here's the next concrete
 step."

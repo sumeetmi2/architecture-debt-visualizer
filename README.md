@@ -3,7 +3,10 @@
 A Claude Code skill that reconciles a repo's design docs against its actual code, then evaluates
 the architecture itself the way a senior/staff architect would — scalability, extensibility,
 long-term maintainability, performance/operational cost, data-architecture, observability, and
-whether the implementation still serves the product's stated technical vision.
+whether the implementation still serves the product's stated technical vision. It also checks
+whether the docs state the scale and extensibility *targets* the architecture is supposed to be
+judged against in the first place — a hardcoded worker count is a very different finding at 50 QPS
+than at 5,000 QPS, and most repos never write down which one applies.
 
 Produces a self-contained, scored HTML report: a static-analysis panel (dependency coupling, git
 churn, contributor/bus-factor signals), a curated shortlist of the most pressing findings, and a
@@ -14,9 +17,13 @@ full findings table filterable by classification and evaluation dimension.
 1. **Reconciliation** — extracts checkable claims from your docs (`docs/*.md`, Mermaid diagrams,
    READMEs) and verifies each against the real code: confirmed, misaligned, or a gap.
 2. **Evaluation** — independent of any doc claim, judges the architecture on its own merits across
-   7 dimensions using a fixed rubric (not open-ended "look around"), so results are reproducible
-   run to run: scalability, extensibility, maintainability, performance/cost, data-architecture,
-   observability, vision-alignment.
+   9 dimensions using a fixed rubric (not open-ended "look around"), so results are reproducible
+   run to run: scale-requirements, extensibility-requirements, scalability, extensibility,
+   maintainability, performance/cost, data-architecture, observability, vision-alignment. The two
+   "requirements" dimensions run first and feed the rest — they check whether the docs ever state a
+   target throughput/latency/growth figure or a named future extensibility need, and if one exists,
+   later scalability/extensibility findings cite it directly instead of judging against an implicit
+   standard. If no target is documented anywhere, that absence is itself a finding.
 3. **Score** — a heuristic, debt-weighted 0-100 score with a per-dimension penalty cap, meant for
    tracking one repo's trend over time, not for ranking systems against each other.
 
@@ -85,6 +92,14 @@ section — a new integration, customer segment, data source, or migration you'r
 on — lets the evaluation pass check whether your current architecture is actually ready for it,
 instead of only judging against today's usage. Some of the most valuable findings in testing came
 from checking a design against a stated future requirement, not its current one.
+
+**State your actual scale and throughput targets somewhere, even roughly.** "We expect X requests/
+second at peak, Y% growth over the next N months, and a Z-ms latency budget" turns every scalability
+finding from a guess into a calibrated judgment — the same hardcoded worker count is a non-issue
+against a low target and a real problem against a high one, and the skill can't tell which without
+a number to check against. If this is missing, the skill flags the absence itself as a finding
+rather than silently guessing; put the number in and every downstream scalability/performance
+finding gets sharper for it.
 
 **If you keep diagrams, prefer a text format (Mermaid) as the source of truth**, and if you also
 keep a frozen image export (PNG/SVG) alongside it, say explicitly which one wins if they disagree.
