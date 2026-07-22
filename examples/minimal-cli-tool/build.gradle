@@ -1,0 +1,9 @@
+// Illustrative only — not buildable. Exists so the fixture reads like a real Gradle Java project.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+application {
+    mainClass = 'com.example.cli.JsonFormatterCli'
+}
