@@ -1,0 +1,17 @@
+{
+  "system_type": "production-service",
+  "criticality": "customer-facing",
+  "lifecycle": "active",
+  "deployment_model": "multi-instance-service",
+  "data_sensitivity": "internal-only",
+  "expected_scale": "200 req/s peak across all 3 HTTP endpoints combined; 50 msg/s sustained on each of task-events/task-reminders; 3x growth expected within 12 months (docs-good/technical-vision.md, 'Scale & Extensibility Targets')",
+  "confidence": "high",
+  "classification_evidence": [
+    "TaskResource.java exposes live REST endpoints (@Path(\"/api/v1/tasks\")), TaskEventConsumer/TaskReminderConsumer are wired Kafka listeners (@Incoming, backed by real connector config in application.properties), and TaskCleanupJob is a live @Scheduled job — three concurrently-running entry-point types, the shape of an operating service, not a library (no published-artifact API surface) or CLI tool (no main/bin entry point) or batch-job-only system (has a synchronous HTTP surface, not just a scheduled job).",
+    "docs-good/technical-vision.md's 'Scale & Extensibility Targets' section states concrete production figures (200 req/s peak, 50 msg/s sustained per channel, p99 latency budgets, 3x growth in 12 months tied to a feature 'rolling out to all users, not just the current beta cohort') — this is a vision doc written for a system with live, growing usage, not a prototype or spike.",
+    "docs-good/technical-vision.md's Versioning & Deprecation Policy (already-adopted /api/v1/ prefix, a formal channel-retirement process) is the kind of policy a team writes once real external callers exist or are anticipated, reinforcing production-service over prototype.",
+    "No Dockerfile, Kubernetes manifest, or other explicit deployment descriptor exists in this repo's scope, so deployment_model ('multi-instance-service') is inferred from the REST+Kafka-consumer shape and per-consumer 'concurrency' config (application.properties) rather than directly confirmed by a manifest — flagged as an inference, not a hard-evidenced fact.",
+    "data_sensitivity classified 'internal-only' rather than 'pii': the only person-linked field is Task.assigneeId (an opaque id, not a name/email/contact field), and no other identity or financial data appears in the schema.",
+    "Note: build.gradle and the top-level README.md (both outside this run's docs-good-only reconciliation scope, but read for context per SKILL.md step 1.5) describe this repo as an illustrative fixture for testing this very skill ('not a buildable project'). That meta-fact about the repo's purpose does not change what the in-scope artifacts (code + docs-good) present themselves as -- the classification above evaluates the system on its own presented merits, per SKILL.md's evidence-first instruction, and confidence is 'high' precisely because docs-good goes out of its way to state real-looking production targets rather than leaving them unstated."
+  ]
+}

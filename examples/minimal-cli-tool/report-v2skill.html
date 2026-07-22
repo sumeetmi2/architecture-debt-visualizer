@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Architecture Debt Report — minimal-cli-tool</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
+          background: #0f172a; color: #e2e8f0; }
+  header { padding: 24px 32px; border-bottom: 1px solid #1e293b; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .subtitle { color: #94a3b8; font-size: 13px; }
+  .summary { display: flex; gap: 12px; padding: 16px 32px; flex-wrap: wrap; }
+  .stat { padding: 10px 16px; border-radius: 8px; background: #1e293b; font-size: 13px; }
+  .stat b { font-size: 18px; display: block; }
+  .stat.confirmed { border-left: 4px solid #16a34a; }
+  .stat.misaligned { border-left: 4px solid #dc2626; }
+  .stat.gap { border-left: 4px solid #d97706; }
+  .stat.risk { border-left: 4px solid #a855f7; }
+  .stat.strength { border-left: 4px solid #0ea5e9; }
+  .indicator-bar { margin: 0 32px 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                     gap: 12px; }
+  .indicator { padding: 14px 16px; border-radius: 12px; background: #111827; border: 1px solid #1e293b; }
+  .indicator-value { font-size: 24px; font-weight: 700; color: #e2e8f0; }
+  .indicator-label { font-size: 12px; color: #cbd5e1; margin-top: 2px; }
+  .indicator-detail { font-size: 11px; margin-top: 4px; }
+  .score-card { margin: 0 32px 16px; padding: 16px 20px; border-radius: 12px; background: #111827;
+                 border: 1px solid #1e293b; display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+  .score-number { font-size: 36px; font-weight: 700; color: #e2e8f0; }
+  .score-max { font-size: 16px; color: #64748b; font-weight: 400; }
+  .score-label { font-size: 14px; color: #cbd5e1; }
+  .score-math { font-size: 12px; }
+  .score-philosophy { flex-basis: 100%; margin-top: 8px; }
+  .score-philosophy summary { cursor: pointer; font-size: 12px; color: #7dd3fc; }
+  .score-philosophy p { font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 8px 0 0; }
+  main { display: flex; gap: 24px; padding: 0 32px 32px; flex-wrap: wrap; align-items: flex-start; }
+  .left-panel { flex: 1 1 380px; min-width: 300px; display: flex; flex-direction: column; gap: 20px; }
+  .panel-card { background: #111827; border-radius: 12px; padding: 16px; border: 1px solid #1e293b; }
+  .panel-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 10px;
+                   text-transform: uppercase; letter-spacing: .03em; }
+  .insight-block + .insight-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid #1e293b; }
+  .insight-title { font-size: 12.5px; font-weight: 600; color: #cbd5e1; }
+  .insight-stats { font-size: 12px; color: #94a3b8; margin: 4px 0 10px; }
+  .insight-sub { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .03em; margin: 10px 0 4px; }
+  .insight-list { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+  .insight-list li { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }
+  .insight-list code { color: #7dd3fc; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; }
+  .insight-list .muted { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+  .insight-list b { color: #e2e8f0; }
+  .key-findings-list { list-style: none; margin: 0; padding: 0; }
+  .key-finding { border-bottom: 1px solid #1e293b; }
+  .key-finding:last-child { border-bottom: none; }
+  .key-finding-link { display: flex; gap: 8px; align-items: baseline; padding: 8px 0; text-decoration: none; color: inherit; }
+  .key-finding-claim { font-size: 12.5px; color: #e2e8f0; }
+  .table-panel { flex: 2 1 640px; min-width: 320px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: top; }
+  th { color: #94a3b8; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-confirmed { background: #16a34a33; color: #4ade80; }
+  .badge-misaligned { background: #dc262633; color: #f87171; }
+  .badge-gap { background: #d9770633; color: #fbbf24; }
+  .badge-risk { background: #a855f733; color: #d8b4fe; }
+  .badge-strength { background: #0ea5e933; color: #7dd3fc; }
+  .badge-sev-high { background: #7f1d1d; color: #fecaca; }
+  .badge-sev-medium { background: #78350f; color: #fde68a; }
+  .badge-sev-low { background: #1e293b; color: #94a3b8; }
+  .dim-tag { color: #64748b; font-size: 10.5px; margin-top: 4px; }
+  .explanation { color: #94a3b8; font-size: 12px; margin-top: 4px; }
+  .recommendation { color: #d8b4fe; font-size: 12px; margin-top: 6px; }
+  .muted { color: #64748b; font-size: 11px; }
+  .evidence { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; }
+  .filters { padding: 4px 32px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .filters .group-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
+  .filters button { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px;
+                      padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  .filters button.active { background: #334155; border-color: #64748b; }
+  tr.hidden { display: none; }
+  tr.flash { outline: 2px solid #38bdf8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Architecture Debt Report — minimal-cli-tool</h1>
+  <div class="subtitle">Doc sources: examples/minimal-cli-tool/README.md, examples/minimal-cli-tool/docs/architecture.md, examples/minimal-cli-tool/docs/technical-vision.md</div>
+</header>
+
+    <div class="indicator-bar">
+      
+      <div class="indicator ">
+        <div class="indicator-value">100%</div>
+        <div class="indicator-label">Documentation fidelity</div>
+        <div class="indicator-detail muted">5 reconciliation findings</div>
+      </div>
+    
+      <div class="indicator ">
+        <div class="indicator-value">Low</div>
+        <div class="indicator-label">Architecture risk</div>
+        <div class="indicator-detail muted">risk index 98/100</div>
+      </div>
+    
+      <div class="indicator ">
+        <div class="indicator-value">100%</div>
+        <div class="indicator-label">Audit coverage</div>
+        <div class="indicator-detail muted">16/16 mandatory checks</div>
+      </div>
+    
+      <div class="indicator ">
+        <div class="indicator-value">100%</div>
+        <div class="indicator-label">Evidence confidence</div>
+        <div class="indicator-detail muted">high-confidence, of 9 rated</div>
+      </div>
+    
+    </div>
+    <div class="score-card">
+      <div class="score-number">98<span class="score-max">/100</span></div>
+      <div class="score-label">Debt index (secondary) — Strong — few unresolved concerns</div>
+      <div class="score-math muted">-3 debt penalty, +1 strength credit</div>
+      <details class="score-philosophy">
+        <summary>Indicator &amp; score philosophy — read before treating any of this as a grade</summary>
+        <p><b>The four indicators above separate two different questions</b> this skill used to
+        blend into one number: whether the <i>docs</i> are accurate (Documentation fidelity) is a
+        different axis from whether the <i>architecture</i> is sound (Architecture risk) — a repo
+        can improve one and regress the other. Audit coverage says how much of the mandatory
+        checklist actually got run (not how many problems were found); Evidence confidence says how
+        much of what's reported rests on direct citation versus inference. A dash (—) means that
+        indicator legitimately wasn't computed for this run (wrong mode, or an older report
+        predating that field) — never a fabricated zero.</p>
+        <p><b>Debt index</b> (secondary, 0-100) is the original heuristic, debt-weighted signal,
+        kept for continuity with earlier reports. Only <b>risk</b>, <b>misaligned</b>, and
+        <b>gap</b> findings count against it, weighted by severity (high=6, medium=3, low=1,
+        info=0) and summed per dimension, each dimension capped at 15, before those capped totals
+        are added together; <b>strength</b> findings give a small capped bonus (+1 each, max +5).
+        Deeper review surfaces more findings, so it isn't comparable across repos or across runs at
+        different scope/depth — use it to track one repo's trend, not to rank systems against each
+        other. Findings aren't independent (several may share one root cause and still get
+        penalized separately). It reflects severity as judged during this review, not business
+        impact or likelihood.</p>
+      </details>
+    </div>
+    
+<div class="summary">
+  <div class="stat confirmed"><b>5</b>Confirmed</div>
+  <div class="stat misaligned"><b>0</b>Misaligned</div>
+  <div class="stat gap"><b>0</b>Gaps</div>
+  <div class="stat risk"><b>3</b>Architecture Risks</div>
+  <div class="stat strength"><b>1</b>Strengths</div>
+</div>
+<div class="filters" id="cls-filters">
+  <span class="group-label">Type</span>
+  <button class="active" data-filter-group="cls" data-filter="all">All</button>
+  <button data-filter-group="cls" data-filter="confirmed">Confirmed</button>
+  <button data-filter-group="cls" data-filter="misaligned">Misaligned</button>
+  <button data-filter-group="cls" data-filter="gap">Gaps</button>
+  <button data-filter-group="cls" data-filter="risk">Risks</button>
+  <button data-filter-group="cls" data-filter="strength">Strengths</button>
+</div>
+<div class="filters" id="dim-filters">
+  <span class="group-label">Dimension</span>
+  <button class="active" data-filter-group="dim" data-filter="all">All</button>
+  <button data-filter-group="dim" data-filter="correctness">Correctness</button>
+  <button data-filter-group="dim" data-filter="scale-requirements">Scale Requirements</button>
+  <button data-filter-group="dim" data-filter="extensibility-requirements">Extensibility Requirements</button>
+  <button data-filter-group="dim" data-filter="scalability">Scalability</button>
+  <button data-filter-group="dim" data-filter="extensibility">Extensibility</button>
+  <button data-filter-group="dim" data-filter="maintainability">Maintainability</button>
+  <button data-filter-group="dim" data-filter="performance-cost">Performance / Cost</button>
+  <button data-filter-group="dim" data-filter="data-architecture">Data Architecture</button>
+  <button data-filter-group="dim" data-filter="observability">Observability</button>
+  <button data-filter-group="dim" data-filter="vision-alignment">Vision Alignment</button>
+</div>
+<main>
+  <div class="left-panel">
+    <div class="panel-card">
+      <div class="panel-title">Key pressing findings</div>
+      <p class='muted'>No high/medium-severity risks, gaps, or misalignments found.</p>
+    </div>
+    <div class="panel-card">
+      <div class="panel-title">Static code analysis</div>
+      
+        <div class="insight-block">
+          <div class="insight-title">Dependency graph</div>
+          <div class="insight-stats">1 packages · 2 classes · 0 cross-package import edges</div>
+          <div class="insight-sub">Most-coupled packages (fan-in + fan-out)</div>
+          <ol class="insight-list">
+            
+          </ol>
+          <div class="insight-sub">Largest packages (class count)</div>
+          <ol class="insight-list">
+            <li><code>cli</code><span class='muted'> — com.example.cli</span><b>2</b></li>
+          </ol>
+        </div>
+        
+
+        <div class="insight-block">
+          <div class="insight-title">Git churn (since 180 days ago)</div>
+          <div class="insight-sub">Highest-churn packages (commits touching them)</div>
+          <ol class="insight-list">
+            <li><code>cli</code><span class='muted'> — com.example.cli</span><b>2</b></li>
+          </ol>
+        </div>
+        
+    </div>
+    <div class="panel-card"><div class="panel-title">Check coverage</div>
+        <div class="insight-block">
+          <div class="insight-stats">16 mandatory checks · 3 risk · 1 strength · 3 clean · 15 not-applicable</div>
+          <div class="insight-stats">System type: <b>cli-tool</b> (informational dimensions: scale-requirements, observability, scalability)</div>
+        </div>
+    </div>
+  </div>
+  <div class="table-panel">
+    <table>
+      <thead><tr><th>Finding</th><th>Claim / Explanation</th><th>Doc source</th><th>Code evidence</th></tr></thead>
+      <tbody id="findings-body">
+        <tr class="finding-row" id="row-f1" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>json-formatter is a two-class command-line tool, invoked once per process, that pretty-prints a JSON file to stdout<div class="explanation">The source tree contains exactly two classes (JsonFormatterCli, JsonFormatter) in package com.example.cli, matching the doc&#x27;s &#x27;two-class command-line tool&#x27; description. main() runs once per process invocation and exits after printing.</div></td><td>examples/minimal-cli-tool/docs/architecture.md<div class="muted">Architecture, opening paragraph</div></td><td class="evidence">examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatterCli.java:11 — class JsonFormatterCli, entry point<br>examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatter.java:7 — class JsonFormatter, second and only other class</td></tr>
+<tr class="finding-row" id="row-f2" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>cli.JsonFormatterCli is the entry point (main) — reads the file named in args[0], calls the formatter, prints the result<div class="explanation">Code matches exactly: reads args[0] as a file path, passes contents to JsonFormatter.prettyPrint, prints the result to stdout.</div></td><td>examples/minimal-cli-tool/docs/architecture.md<div class="muted">Key Components table, JsonFormatterCli row</div></td><td class="evidence">examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatterCli.java:18 — String raw = Files.readString(Path.of(args[0]));<br>examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatterCli.java:19 — System.out.println(JsonFormatter.prettyPrint(raw));</td></tr>
+<tr class="finding-row" id="row-f3" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>cli.JsonFormatter is pure, stateless indent/reformat logic with no parsing/validation — it trusts the input is valid JSON<div class="explanation">The method is a single static, stateless character-by-character rewrite with no JSON parser or schema validation anywhere in the class — matches the doc&#x27;s claim precisely, including the explicit &#x27;trusts the input&#x27; caveat.</div></td><td>examples/minimal-cli-tool/docs/architecture.md<div class="muted">Key Components table, JsonFormatter row</div></td><td class="evidence">examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatter.java:12 — public static String prettyPrint(String raw) — static, no instance state, no fields on the class<br>examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatter.java:4 — Javadoc: &#x27;this tool trusts its input is valid JSON and reformats whitespace around structural characters&#x27; — no parse/validate step exists in the method body</td></tr>
+<tr class="finding-row" id="row-f4" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>Data flow: process starts and main(String[] args) runs; file contents are read fully into memory as a String; JsonFormatter.prettyPrint reformats it in a single pass; result is written to stdout and the process exits<div class="explanation">Each of the four documented steps has a direct code counterpart, in the same order: main() entry, full-file read into a String, single-pass reformat loop, stdout write and implicit process exit.</div></td><td>examples/minimal-cli-tool/docs/architecture.md<div class="muted">Data flow, steps 1-4</div></td><td class="evidence">examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatterCli.java:13 — main(String[] args)<br>examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatter.java:16 — single for-loop over raw.length() — one pass, no re-scan</td></tr>
+<tr class="finding-row" id="row-f5" data-cls="confirmed" data-dim="correctness" data-sev="info"><td><span class="badge badge-confirmed">Confirmed</span><div class="dim-tag">Correctness · Info</div></td><td>There is no server, no listener, no background thread, no persistent state between invocations<div class="explanation">Negative search across the entire (2-file) source tree confirms no server/listener/background-thread/persistent-state code exists anywhere, matching the doc&#x27;s claim exactly.</div></td><td>examples/minimal-cli-tool/docs/architecture.md<div class="muted">Data flow, closing sentence</div></td><td class="evidence"> — Searched both source files for ServerSocket, HttpServer, @Path, @RestController, Consumer, Listener, Kafka, JMS, Thread, ExecutorService, static/instance fields holding cross-invocation state — none found.</td></tr>
+<tr class="finding-row" id="row-f6" data-cls="risk" data-dim="extensibility-requirements" data-sev="low"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Extensibility Requirements · Low</div></td><td>The repo names concrete future extension points but no timeline or priority for any of them<div class="explanation">technical-vision.md does name candidate future extension points (alternate input formats, new flags), which is more than many CLI tools document — but it stops short of a timeline or priority order, so extensibility-requirements.a&#x27;s &#x27;named future use cases and any stated timeline&#x27; is only half satisfied. For a 2-file utility this is low-severity, not a structural problem, but it is a real, citable gap rather than a clean pass.</div><div class="recommendation"><b>Recommendation:</b> If/when a second format or flag is actually planned, add a one-line &#x27;next up&#x27; note to technical-vision.md so contributors know the priority order rather than picking arbitrarily.</div></td><td>examples/minimal-cli-tool/docs/technical-vision.md<div class="muted">Why this shape, &#x27;Growth means more file formats or flags&#x27; bullet</div></td><td class="evidence">examples/minimal-cli-tool/docs/technical-vision.md:13 — names JSON5, YAML as example future input formats and --compact as an example future flag, with no timeline, priority order, or trigger condition for any of them</td></tr>
+<tr class="finding-row" id="row-f7" data-cls="risk" data-dim="extensibility-requirements" data-sev="low"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Extensibility Requirements · Low</div></td><td>No stated bar for how fast/cheaply a new format or flag should be addable to json-formatter<div class="explanation">(Architectural evaluation) technical-vision.md frames the growth axis (formats/flags, not load) but never states how cheap that growth should be — no target like &#x27;a new output mode should be addable in under N lines&#x27; or &#x27;without touching JsonFormatterCli&#x27;. Low severity given the tool&#x27;s current single-behavior scope, but this is the kind of bar that becomes valuable exactly when the first second format is added.</div><div class="recommendation"><b>Recommendation:</b> Not urgent at this scope; worth adding once a second format/flag is actually implemented, so extensibility.a has something concrete to test the first real instance against.</div></td><td>examples/minimal-cli-tool/docs/technical-vision.md<div class="muted">no explicit doc claim — evaluated directly against code</div></td><td class="evidence"> — Searched docs/technical-vision.md and docs/architecture.md in full for any cost/time/LOC bar on adding a new format or flag — none stated, only the general framing that growth &#x27;means more formats/flags, not more load&#x27;</td></tr>
+<tr class="finding-row" id="row-f8" data-cls="risk" data-dim="extensibility" data-sev="low"><td><span class="badge badge-risk">Risk</span><div class="dim-tag">Extensibility · Low</div></td><td>No &#x27;how to add a new format/flag&#x27; pattern doc exists despite the vision naming format/flag growth as the tool&#x27;s stated evolution path<div class="explanation">(Architectural evaluation) The vision doc commits to a specific growth model (new input formats, new CLI flags) but there is currently zero guidance — no pattern doc, no extension-point comment — for how a contributor would actually add one. Because there is exactly one behavior implemented today, extensibility.a&#x27;s adoption-rate measurement (fraction of instances following the pattern) has a denominator of zero/one and can&#x27;t yet show drift, but the absence of any scaffolding for the one growth path the vision names is itself the finding.</div><div class="recommendation"><b>Recommendation:</b> When the first additional format or flag is actually added, capture the steps taken as a short &#x27;How to add a format&#x27; note in docs/architecture.md so the second addition has a pattern to follow (or deviate from, visibly).</div></td><td>examples/minimal-cli-tool/docs/technical-vision.md<div class="muted">Why this shape, &#x27;Growth means more file formats or flags&#x27; bullet</div></td><td class="evidence"> — Searched docs/ and README.md for a step-by-step &#x27;add a new format&#x27; or &#x27;add a new flag&#x27; pattern doc — none exists; only JsonFormatterCli.java&#x27;s single args.length!=1 usage check hints at where flag parsing would need to change</td></tr>
+<tr class="finding-row" id="row-f9" data-cls="strength" data-dim="vision-alignment" data-sev="info"><td><span class="badge badge-strength">Strength</span><div class="dim-tag">Vision Alignment · Info</div></td><td>The repo has a substantive, non-scaffolding technical vision doc explaining why the tool is shaped the way it is, including explicit non-goals<div class="explanation">technical-vision.md is not a stub — it gives concrete rationale for three separate design choices (no server, no persistence, format/flag-based growth) and a dedicated Non-goals section explicitly ruling out becoming a hosted service. This is exactly the kind of vision doc the rubric looks for and rewards crediting; most repos this small skip it entirely.</div></td><td>examples/minimal-cli-tool/docs/technical-vision.md<div class="muted">whole document</div></td><td class="evidence">examples/minimal-cli-tool/docs/technical-vision.md:1 — full doc: &#x27;Why this shape&#x27; rationale + explicit &#x27;Non-goals&#x27; section, not a placeholder/scaffold</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<script>
+  const state = { cls: 'all', dim: 'all' };
+  const rows = document.querySelectorAll('.finding-row');
+
+  function applyFilters() {
+    rows.forEach(r => {
+      const clsOk = state.cls === 'all' || r.dataset.cls === state.cls;
+      const dimOk = state.dim === 'all' || r.dataset.dim === state.dim;
+      r.classList.toggle('hidden', !(clsOk && dimOk));
+    });
+  }
+
+  document.querySelectorAll('.filters button').forEach(btn => btn.addEventListener('click', () => {
+    const group = btn.dataset.filterGroup;
+    document.querySelectorAll(`.filters button[data-filter-group="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state[group] = btn.dataset.filter;
+    applyFilters();
+  }));
+
+  document.querySelectorAll('.key-finding-link').forEach(link => link.addEventListener('click', (ev) => {
+    const targetId = link.getAttribute('href').slice(1);
+    const row = document.getElementById(targetId);
+    if (!row) return;
+    ev.preventDefault();
+    document.querySelectorAll('.filters button[data-filter-group="cls"]')[0].click();
+    document.querySelectorAll('.filters button[data-filter-group="dim"]')[0].click();
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('flash');
+    setTimeout(() => row.classList.remove('flash'), 2000);
+  }));
+</script>
+</body>
+</html>

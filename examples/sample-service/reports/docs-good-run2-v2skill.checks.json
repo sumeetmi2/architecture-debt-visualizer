@@ -1,0 +1,189 @@
+{
+  "checks": [
+    {
+      "id": "scale-requirements.a",
+      "dimension": "scale-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_id": "f19"
+    },
+    {
+      "id": "scale-requirements.b",
+      "dimension": "scale-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_id": "f19"
+    },
+    {
+      "id": "scale-requirements.c",
+      "dimension": "scale-requirements",
+      "status": "clean",
+      "scope": ["scalability.a", "vision-alignment.b"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/docs-good/technical-vision.md", "line": 5, "note": "200 req/s peak / 50 msg/s per channel / 3x growth in 12mo figures carried forward and cited explicitly in f14 (scalability.a + vision-alignment.b), calibrating the hardcoded concurrency=1 / worker-count=1 finding against the real target instead of a guess"}
+      ]
+    },
+    {
+      "id": "extensibility-requirements.a",
+      "dimension": "extensibility-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_id": "f20"
+    },
+    {
+      "id": "extensibility-requirements.b",
+      "dimension": "extensibility-requirements",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_id": "f20"
+    },
+    {
+      "id": "vision-alignment.a",
+      "dimension": "vision-alignment",
+      "status": "strength",
+      "scope": ["docs-good/technical-vision.md"],
+      "confidence": "high",
+      "finding_id": "f21"
+    },
+    {
+      "id": "vision-alignment.b",
+      "dimension": "vision-alignment",
+      "status": "risk",
+      "scope": ["TaskEventConsumer", "TaskCleanupJob"],
+      "confidence": "high",
+      "finding_id": "f14"
+    },
+    {
+      "id": "data-architecture.a",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["Task"],
+      "confidence": "high",
+      "finding_id": "f10"
+    },
+    {
+      "id": "data-architecture.b",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["Task"],
+      "confidence": "high",
+      "finding_id": "f11"
+    },
+    {
+      "id": "data-architecture.c",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 1, "note": "grep for FOREIGN KEY/REFERENCES across the only DDL file in this repo (sql/001-task.sql) -- zero matches. The schema is a single table with no other in-repo table to reference; assigneeId (indexed, not FK-constrained) most plausibly refers to a user identity owned by another service/bounded context, which is the expected, correct pattern at a service boundary rather than a gap. Referential-integrity strategy can't be meaningfully stress-tested further within a one-table schema."}
+      ]
+    },
+    {
+      "id": "data-architecture.d",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["Task"],
+      "confidence": "high",
+      "finding_id": "f12"
+    },
+    {
+      "id": "data-architecture.e",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["Task"],
+      "reason": "No monetary/currency-bearing column exists anywhere in this schema (task-tracking domain: status, dates, priority, assignee -- no amounts). The decimal-vs-float/currency-handling check has no in-scope instance to evaluate against."
+    },
+    {
+      "id": "data-architecture.f",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["Task"],
+      "confidence": "high",
+      "finding_id": "f13"
+    },
+    {
+      "id": "data-architecture.g",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 12, "note": "grepped the DDL for JSON/BLOB/TEXT column types -- none found; all 7 columns are scalar (VARCHAR/INT/DATETIME). No shadow/parallel schemaless representation of Task exists."}
+      ]
+    },
+    {
+      "id": "scalability.a",
+      "dimension": "scalability",
+      "status": "risk",
+      "scope": ["TaskEventConsumer", "TaskCleanupJob"],
+      "confidence": "high",
+      "finding_id": "f14"
+    },
+    {
+      "id": "performance-cost.a",
+      "dimension": "performance-cost",
+      "status": "risk",
+      "scope": ["TaskResource", "TaskService"],
+      "confidence": "medium",
+      "finding_id": "f15"
+    },
+    {
+      "id": "extensibility.a",
+      "dimension": "extensibility",
+      "status": "strength",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "confidence": "high",
+      "finding_id": "f22"
+    },
+    {
+      "id": "extensibility.b",
+      "dimension": "extensibility",
+      "status": "risk",
+      "scope": ["TaskService"],
+      "confidence": "high",
+      "finding_id": "f16"
+    },
+    {
+      "id": "observability.a",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer", "TaskCleanupJob"],
+      "confidence": "high",
+      "finding_id": "f17"
+    },
+    {
+      "id": "observability.b",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["TaskEventConsumer"],
+      "confidence": "high",
+      "finding_id": "f18"
+    },
+    {
+      "id": "maintainability.a",
+      "dimension": "maintainability",
+      "status": "clean",
+      "scope": ["analysis/churn.json"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "examples/sample-service/analysis/churn.json", "line": 93, "note": "bus_factor_hotspots and high_diversity_hotspots are both empty arrays; every package shows 1-2 total commits and distinct_authors=1. Sanity-checked against the repo's actual git history: the entire repo is 16 commits, all made the same day this run was performed -- there simply isn't enough git history yet for a bus-factor signal to be meaningful one way or the other. This is a 'nothing to report yet' clean, not a 'verified no bus-factor risk' clean -- noted as a limitation, not overclaimed."}
+      ]
+    },
+    {
+      "id": "maintainability.b",
+      "dimension": "maintainability",
+      "status": "clean",
+      "scope": ["TaskEventConsumer", "TaskReminderConsumer"],
+      "confidence": "high",
+      "evidence": [
+        {"note": "extensibility.a (f22) found 100% (2/2) adoption of the documented consumer pattern -- with zero inconsistent instances, there is no replication-cost tax to calculate here. Would become a real finding the moment a 3rd, non-conforming consumer is added."}
+      ]
+    }
+  ]
+}

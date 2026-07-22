@@ -1,0 +1,192 @@
+{
+  "checks": [
+    {
+      "id": "scale-requirements.a",
+      "dimension": "scale-requirements",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No stated throughput/QPS/TPS or latency SLO anywhere in docs/README; technical-vision.md explicitly disclaims the concept ('There is no concept of requests per second for a tool a human runs by hand or a script calls once per file'). Dimension is informational for system_type=cli-tool per rubric_manifest.json's system_type_overrides, so this absence is not counted as a risk."
+    },
+    {
+      "id": "scale-requirements.b",
+      "dimension": "scale-requirements",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No growth-horizon or expected-scale-in-N-years figure documented anywhere; technical-vision.md explicitly frames growth as 'more file formats or flags,' not load growth. Informational for cli-tool — absence not penalized."
+    },
+    {
+      "id": "scale-requirements.c",
+      "dimension": "scale-requirements",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No scale target exists to carry forward from (a)/(b); scalability.a below is calibrated accordingly ('no throughput ceiling is a meaningful concept for a single-invocation process'), consistent with cli-tool's informational status for this whole dimension."
+    },
+    {
+      "id": "extensibility-requirements.a",
+      "dimension": "extensibility-requirements",
+      "status": "risk",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "finding_id": "f6"
+    },
+    {
+      "id": "extensibility-requirements.b",
+      "dimension": "extensibility-requirements",
+      "status": "risk",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "finding_id": "f7"
+    },
+    {
+      "id": "vision-alignment.a",
+      "dimension": "vision-alignment",
+      "status": "strength",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "finding_id": "f9"
+    },
+    {
+      "id": "vision-alignment.b",
+      "dimension": "vision-alignment",
+      "status": "clean",
+      "scope": ["com.example.cli"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "examples/minimal-cli-tool/docs/technical-vision.md", "line": 7, "note": "vision's 'no server, no persistence' claims"},
+        {"file": "examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatterCli.java", "line": 13, "note": "main() has zero I/O beyond one file read, zero background execution, zero cross-invocation state"},
+        {"file": "examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatter.java", "line": 7, "note": "stateless static class, matches vision's 'no persistence, no schema' claim"}
+      ],
+      "reason": "The only architecture decision present in this single-commit repo (the initial implementation) is fully consistent with the vision's stated no-server/no-persistence stance. Noted limitation: repo has only 1 commit total, so there are not literally '2-3 recently-made decisions' to check independently — this is a single data point, not three."
+    },
+    {
+      "id": "data-architecture.a",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No ORM, no @Id/entity mapping, no persisted identity of any kind exists — the tool holds no state between invocations and defines no entities."
+    },
+    {
+      "id": "data-architecture.b",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No columns/tables/fields to categorize for naming-convention drift — the only data is a transient in-memory String per invocation."
+    },
+    {
+      "id": "data-architecture.c",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No DDL files exist anywhere under this directory (find for *.sql/*ddl* returned nothing), so there is nothing to grep FOREIGN KEY/REFERENCES against."
+    },
+    {
+      "id": "data-architecture.d",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No partitioning/sharding of any kind — no persistent storage exists at all."
+    },
+    {
+      "id": "data-architecture.e",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No currency/monetary or numeric persisted data exists; JsonFormatter treats all input as opaque characters and never parses numeric literals at all (confirmed reconciliation finding f3), so there is no decimal-vs-float choice to evaluate."
+    },
+    {
+      "id": "data-architecture.f",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "There is no schema to check forward-readiness of. The vision's stated 'coming next' (more formats/flags, technical-vision.md line 13) is a code-level extension point, not a schema-evolution question."
+    },
+    {
+      "id": "data-architecture.g",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No tables exist at all, columnar or otherwise, so there is nothing for a JSON-blob shadow representation to duplicate."
+    },
+    {
+      "id": "scalability.a",
+      "dimension": "scalability",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "Grepped both source files for hardcoded thread/worker/concurrency/timeout/batch-size numbers — none exist; the process handles exactly one file per invocation by design, single-threaded, with no config surface at all. Dimension is informational for cli-tool — no ceiling concept applies to a single-shot process."
+    },
+    {
+      "id": "performance-cost.a",
+      "dimension": "performance-cost",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No external calls exist anywhere in the 2-file source tree (no network, DB, or third-party API calls) — the only I/O is one local Files.readString call per invocation. No cost/rate guardrail dimension applies."
+    },
+    {
+      "id": "extensibility.a",
+      "dimension": "extensibility",
+      "status": "risk",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "finding_id": "f8"
+    },
+    {
+      "id": "extensibility.b",
+      "dimension": "extensibility",
+      "status": "clean",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatterCli.java", "line": 1, "note": "full read"},
+        {"file": "examples/minimal-cli-tool/src/main/java/com/example/cli/JsonFormatter.java", "line": 1, "note": "full read"}
+      ],
+      "reason": "Only one behavior/extension point exists currently (JSON pretty-print); with just 2 files and one code path, there is no second conceptually-identical concern to compare modeling consistency against yet."
+    },
+    {
+      "id": "observability.a",
+      "dimension": "observability",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No traffic/errors/latency/saturation signals exist anywhere (no metrics library, no counters, no timers) — expected for a single-shot local process with no operator watching it in real time. Dimension is informational for cli-tool per system_type_overrides."
+    },
+    {
+      "id": "observability.b",
+      "dimension": "observability",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "No retry/recovery/reconciliation code path exists to trace — on failure the process exits non-zero (uncaught IOException, or an explicit exit(2) for bad usage in JsonFormatterCli.java:16) with no persistent/queued state to recover, so there is no 'drop and recover later' pattern for this check to apply to. Informational for cli-tool."
+    },
+    {
+      "id": "maintainability.a",
+      "dimension": "maintainability",
+      "status": "clean",
+      "scope": ["com.example.cli"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "/tmp/adv-saenQk/churn.json", "note": "bus_factor_hotspots: [], high_diversity_hotspots: [] — repo has 1 total commit, single author (Sumeet Sharma), below compute_churn.py's hotspot-min-commits threshold"}
+      ],
+      "reason": "No bus-factor hotspot signal fires because the repo is a single fresh commit; sanity-checked with the raw churn.json output rather than treating the empty hotspot lists as evidence of health on their own. This is a genuine limitation of the signal (too young to show a pattern), not a clean bill of health in the mature-codebase sense — noted explicitly rather than silently treated as 'no risk.'"
+    },
+    {
+      "id": "maintainability.b",
+      "dimension": "maintainability",
+      "status": "not-applicable",
+      "scope": ["com.example.cli"],
+      "confidence": "high",
+      "reason": "extensibility.a (f8) found no pattern doc exists, but since there is exactly one implemented instance of the extension point (no second format/flag yet), no inconsistency cost has actually been paid yet — this check evaluates present cost of inconsistent adoption, which requires at least two instances to compare."
+    }
+  ]
+}

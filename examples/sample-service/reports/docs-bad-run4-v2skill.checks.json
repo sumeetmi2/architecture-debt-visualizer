@@ -1,0 +1,181 @@
+{
+  "checks": [
+    {
+      "id": "scale-requirements.a",
+      "dimension": "scale-requirements",
+      "status": "risk",
+      "scope": ["docs-bad"],
+      "confidence": "high",
+      "finding_id": "f7"
+    },
+    {
+      "id": "scale-requirements.b",
+      "dimension": "scale-requirements",
+      "status": "risk",
+      "scope": ["docs-bad"],
+      "confidence": "high",
+      "finding_id": "f8"
+    },
+    {
+      "id": "scale-requirements.c",
+      "dimension": "scale-requirements",
+      "status": "clean",
+      "scope": ["scalability.a", "performance-cost.a"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/docs-bad/technical-vision.md", "line": 13, "note": "No scale target found (f7/f8); explicitly carried that absence forward into the scalability.a finding (f15), which states its severity reflects structural inflexibility rather than a calibrated judgment of current headroom"}
+      ]
+    },
+    {
+      "id": "extensibility-requirements.a",
+      "dimension": "extensibility-requirements",
+      "status": "risk",
+      "scope": ["docs-bad"],
+      "confidence": "high",
+      "finding_id": "f9"
+    },
+    {
+      "id": "extensibility-requirements.b",
+      "dimension": "extensibility-requirements",
+      "status": "risk",
+      "scope": ["docs-bad"],
+      "confidence": "medium",
+      "finding_id": "f10"
+    },
+    {
+      "id": "vision-alignment.a",
+      "dimension": "vision-alignment",
+      "status": "risk",
+      "scope": ["docs-bad/technical-vision.md"],
+      "confidence": "high",
+      "finding_id": "f11"
+    },
+    {
+      "id": "vision-alignment.b",
+      "dimension": "vision-alignment",
+      "status": "not-applicable",
+      "scope": ["docs-bad/technical-vision.md"],
+      "reason": "technical-vision.md is empty scaffolding (vision-alignment.a) — there is no stated vision content to check any in-flight architecture decision against. Checked anyway for anything usable: all 3 headings (Design Philosophy, Key Architectural Decisions, Future Direction) contain only unfilled HTML-comment prompts."
+    },
+    {
+      "id": "data-architecture.a",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["com.example.tasks.entity"],
+      "confidence": "high",
+      "finding_id": "f12"
+    },
+    {
+      "id": "data-architecture.b",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "finding_id": "f13"
+    },
+    {
+      "id": "data-architecture.c",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "examples/sample-service/sql/001-task.sql", "line": 1, "note": "grepped FOREIGN KEY/REFERENCES across all DDL files in scope (only 001-task.sql exists) — none found; single-table schema with no second table to reference, so this is not a gap, it's the expected shape for the current schema size"}
+      ]
+    },
+    {
+      "id": "data-architecture.d",
+      "dimension": "data-architecture",
+      "status": "risk",
+      "scope": ["sql/001-task.sql", "com.example.tasks.scheduler"],
+      "confidence": "high",
+      "finding_id": "f14"
+    },
+    {
+      "id": "data-architecture.e",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["sql/001-task.sql"],
+      "reason": "Task has no monetary/currency fields at all (Id, Status, CreatedDate, CreatedAt, CompletedAt, priority, assigneeId) — the decimal-vs-float/currency-handling question is moot for this table. priority is a plain ordinal INT, which is an appropriate type choice for a non-monetary value."
+    },
+    {
+      "id": "data-architecture.f",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["sql/001-task.sql"],
+      "reason": "docs-bad/technical-vision.md states no forward-looking product direction (vision-alignment.a) — there is nothing named as 'coming next' to check the schema's forward-readiness against."
+    },
+    {
+      "id": "data-architecture.g",
+      "dimension": "data-architecture",
+      "status": "strength",
+      "scope": ["sql/001-task.sql"],
+      "confidence": "high",
+      "finding_id": "f20"
+    },
+    {
+      "id": "scalability.a",
+      "dimension": "scalability",
+      "status": "risk",
+      "scope": ["com.example.tasks.scheduler", "com.example.tasks.consumer"],
+      "confidence": "high",
+      "finding_id": "f15"
+    },
+    {
+      "id": "performance-cost.a",
+      "dimension": "performance-cost",
+      "status": "not-applicable",
+      "scope": ["com.example.tasks.repository"],
+      "reason": "No expensive external call (data-warehouse query, third-party API, or anything scaling with data scanned) exists anywhere in this repo's scope. TaskRepository is an explicitly illustrative stub with no real persistence provider wired up (see its own source comment), and no other outbound client exists in the codebase to check a cost/rate guardrail on."
+    },
+    {
+      "id": "extensibility.a",
+      "dimension": "extensibility",
+      "status": "strength",
+      "scope": ["com.example.tasks.consumer"],
+      "confidence": "medium",
+      "finding_id": "f18"
+    },
+    {
+      "id": "extensibility.b",
+      "dimension": "extensibility",
+      "status": "strength",
+      "scope": ["com.example.tasks.resource", "com.example.tasks.service", "com.example.tasks.repository"],
+      "confidence": "high",
+      "finding_id": "f19"
+    },
+    {
+      "id": "observability.a",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["com.example.tasks.resource", "com.example.tasks.consumer", "com.example.tasks.scheduler"],
+      "confidence": "high",
+      "finding_id": "f16"
+    },
+    {
+      "id": "observability.b",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["com.example.tasks.consumer"],
+      "confidence": "high",
+      "finding_id": "f17"
+    },
+    {
+      "id": "maintainability.a",
+      "dimension": "maintainability",
+      "status": "clean",
+      "scope": ["com.example.tasks"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "examples/sample-service/analysis/churn.json", "line": 93, "note": "bus_factor_hotspots: [] and high_diversity_hotspots: [] — compute_churn.py flagged nothing. package_authors shows a single author (Sumeet Sharma) across all 6 packages with only 1-2 commits each in the last 180 days, consistent with a small, recently-authored fixture rather than a real multi-contributor production history"}
+      ]
+    },
+    {
+      "id": "maintainability.b",
+      "dimension": "maintainability",
+      "status": "not-applicable",
+      "scope": ["com.example.tasks.consumer"],
+      "reason": "extensibility.a found no inconsistent pattern adoption to cost out (docs-bad has no pattern doc, and the 2 actual consumer instances present are structurally consistent) — there is nothing here for maintainability.b to price."
+    }
+  ]
+}

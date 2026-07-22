@@ -1,0 +1,19 @@
+{
+  "system_type": "production-service",
+  "criticality": "customer-facing",
+  "lifecycle": "active",
+  "deployment_model": "multi-instance-service",
+  "data_sensitivity": "internal-only",
+  "expected_scale": "unknown",
+  "confidence": "low",
+  "classification_evidence": [
+    "src/main/java/com/example/tasks/resource/TaskResource.java exposes a JAX-RS HTTP surface (@Path(\"/api/v1/tasks\") with POST/GET/POST bulk-import) — a running service entry point, not a library API.",
+    "src/main/java/com/example/tasks/consumer/TaskEventConsumer.java and TaskReminderConsumer.java are @Incoming Kafka (smallrye-kafka) consumers wired and enabled by default in application.properties (lines 2-12) — a second, independent always-on entry point alongside the HTTP surface.",
+    "src/main/java/com/example/tasks/scheduler/TaskCleanupJob.java is an @Scheduled(every = \"1h\") recurring job — a third entry point. Three concurrent entry-point types (HTTP + messaging + cron) is the shape of a deployed backend service, not a library/CLI/batch-only tool.",
+    "application.properties externalizes some config via env-var defaults (TASK_EVENTS_CONSUMER_ENABLED, TASK_REMINDERS_CONSUMER_ENABLED, NOTIFICATION_BATCH_SIZE) — a pattern associated with services deployed across multiple environments/instances, not a single hardcoded local run. No deployment manifest (Dockerfile/k8s/compose) exists anywhere in the code scope given, so deployment_model is inferred from this config-externalization pattern alone, at low confidence, not confirmed directly.",
+    "COUNTER-EVIDENCE, weighed and set aside per the strictness default: build.gradle (in scope) contains the comment 'Illustrative only — this sample is source for the skill to analyze, not a buildable project. No dependencies are declared; there's nothing to compile or run here.' This is real, in-scope evidence that the repo is not actually intended to run as a deployed service. None of the five alternative system_type buckets (library, cli-tool, batch-job, prototype, archived) cleanly fits a 'non-buildable teaching fixture that mimics production-service shape' either — 'prototype' is anchored to explicit WIP/experimental/spike language, which this is not. Given system-classification.md's instruction to default to production-service (the strictest tier) whenever confidence is low or the fit is unclear, and given the code's operational shape unambiguously matches a production-service's entry-point pattern, system_type is classified production-service with confidence explicitly set to low rather than medium/high to flag this tension honestly rather than hide it.",
+    "docs-bad/technical-vision.md is empty HTML-comment scaffolding with no stated scale target, growth horizon, or named future integrations anywhere in the docs-bad set, so expected_scale is left literally 'unknown' rather than guessed.",
+    "data_sensitivity set to 'internal-only' rather than 'pii': the only person-identifying field is assigneeId (a bare identifier/foreign key on Task, sql/001-task.sql line 19), with no name/email/contact data anywhere in scope — a weak association, not clearly PII on its own.",
+    "criticality set to 'customer-facing' (free text, informational only) because the REST surface exists to serve task CRUD to callers, but nothing in scope suggests financial or safety criticality — no payment, currency, or regulated data anywhere in the schema or code."
+  ]
+}

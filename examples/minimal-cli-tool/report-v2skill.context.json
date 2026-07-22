@@ -1,0 +1,18 @@
+{
+  "system_type": "cli-tool",
+  "criticality": "internal-tooling",
+  "lifecycle": "active",
+  "deployment_model": "not-deployed",
+  "data_sensitivity": "none",
+  "expected_scale": "unknown",
+  "confidence": "high",
+  "classification_evidence": [
+    "src/main/java/com/example/cli/JsonFormatterCli.java:13 declares `public static void main(String[] args)` — a single-invocation CLI entry point, not a service listener or long-running process.",
+    "No server/listener/consumer/network-accepting code exists anywhere in the 2-file source tree — grepped for ServerSocket, HttpServer, @Path, @RestController, @GetMapping, Consumer, Listener, Kafka, JMS, Socket across src/: zero matches.",
+    "build.gradle applies the Gradle `application` plugin with `mainClass = 'com.example.cli.JsonFormatterCli'` — packaged as a runnable application, not a published library artifact (no `maven-publish`/`java-library` plugin, no intended public API surface for other code to depend on). Rules out `library` in favor of `cli-tool`.",
+    "docs/technical-vision.md states outright: 'No server, no throughput target... There is no concept of requests per second for a tool a human runs by hand or a script calls once per file.'",
+    "docs/architecture.md states: 'There is no server, no listener, no background thread, no persistent state between invocations — every run is a fresh process that does one thing and exits.'",
+    "No DDL/schema/migration files anywhere under this directory (find for *.sql/*ddl* returned nothing) — consistent with a stateless, non-persistent CLI tool.",
+    "Repo has a single git commit (8fbf608) adding the whole fixture at once; commit history is thin, which could superficially suggest `prototype`, but there is no WIP/spike/experimental language anywhere, and docs/technical-vision.md explicitly frames this as a deliberately-scoped, complete tool with a stated Non-goals section ('This is intentionally not going to become a long-running service') — positive evidence against `prototype`, not just an absence of negative evidence."
+  ]
+}
