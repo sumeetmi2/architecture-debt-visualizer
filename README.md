@@ -1,12 +1,19 @@
 # architecture-debt-visualizer
 
-A Claude Code skill that reconciles a repo's design docs against its actual code, then evaluates
-the architecture itself the way a senior/staff architect would — scalability, extensibility,
-long-term maintainability, performance/operational cost, data-architecture, observability, and
-whether the implementation still serves the product's stated technical vision. It also checks
-whether the docs state the scale and extensibility *targets* the architecture is supposed to be
-judged against in the first place — a hardcoded worker count is a very different finding at 50 QPS
-than at 5,000 QPS, and most repos never write down which one applies.
+An open-source Claude Code skill and plugin for architecture reviews, documentation-drift
+detection, and evidence-based technical-debt analysis.
+
+It compares your architecture docs against the real codebase, flags stale or incorrect design
+claims, and independently evaluates the architecture across 12 dimensions — scalability,
+extensibility, reliability/resilience, security boundaries, change safety, data architecture,
+observability, maintainability, performance/cost, and vision-alignment.
+
+Use it to answer questions like:
+- Do our architecture docs still match the code?
+- Which architectural assumptions have gone stale?
+- What scalability, reliability, security, or maintainability risks actually exist — with evidence?
+- Which undocumented services, endpoints, consumers, or datastores has the codebase grown?
+- Is the system built for the scale/extensibility targets it's supposed to hit?
 
 Produces a self-contained HTML report with four headline indicators — Documentation fidelity,
 Architecture risk, Audit coverage, Evidence confidence — plus a static-analysis panel (dependency
