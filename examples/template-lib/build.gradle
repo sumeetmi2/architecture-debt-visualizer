@@ -1,0 +1,11 @@
+// Illustrative only — not buildable. Exists so the fixture reads like a real Gradle Java library
+// project: java-library plugin (not application — no mainClassName, no entry point), published
+// under group:artifactId:version coordinates other services depend on.
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+group = 'com.example'
+version = '1.2.1'
+

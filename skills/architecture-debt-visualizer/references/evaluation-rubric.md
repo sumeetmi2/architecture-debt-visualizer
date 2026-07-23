@@ -233,6 +233,9 @@ missing (the timeline, not the whole requirement) — don't score it as either a
 equivalent to a `high`-severity total absence;
 (b) search for a stated bar on how fast/cheaply a new instance of the system's core extension point
 must be addable — if found, carry it into the Extensibility check and judge actual cost against it.
+**Absent is a `risk`, same as (a)** — a distinct fact from (a) (naming future use cases is not the
+same as stating a cost bar for adding one), so both can independently be `risk` on the same repo
+without double-counting.
 
 **Vision alignment**:
 (a) find and read the vision/strategy doc(s) — empty/missing is the finding for this letter;
@@ -298,7 +301,13 @@ single-author high-churn package, cross-reference it against what that code actu
 bus-factor risk on routine CRUD is low-priority, bus-factor risk on the most architecturally
 complex or currently-dormant code is a real, specific finding. Sanity-check with
 `git log --no-merges --pretty=format:%an | sort | uniq -c` before citing it, to rule out
-merge-commit attribution skew;
+merge-commit attribution skew. **Too little (or zero) commit history to compute a confident
+signal is `clean` or low-severity `risk` with the thinness disclosed as a limitation — never
+`not-applicable`.** The concept this check is about (contributor concentration) exists for any
+codebase with at least one author; a young/thin history just caps how much confidence the answer
+can carry, it doesn't remove the thing being checked. `not-applicable` is reserved for a concept
+that genuinely doesn't exist here at all (see report-schema.md's not-applicable-vs-clean line), and
+bus-factor always exists once there's any code and any author;
 (b) check the "how to add X" pattern-doc adoption rate from Extensibility(a) again here
 specifically for what inconsistent adoption *costs* going forward (a fix/change now has to be
 replicated N times instead of landing once) — a distinct finding from Extensibility(a)'s

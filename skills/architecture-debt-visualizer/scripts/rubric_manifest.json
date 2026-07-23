@@ -13,7 +13,7 @@
       "label": "Extensibility Requirements",
       "checks": [
         {"id": "extensibility-requirements.a", "letter": "a", "summary": "Named future tenants/integrations/use cases and any stated timeline — absent is a risk."},
-        {"id": "extensibility-requirements.b", "letter": "b", "summary": "Stated bar for how fast/cheaply a new instance of the system's core extension point must be addable — if found, carry it into the extensibility check and judge actual extension cost against it directly."}
+        {"id": "extensibility-requirements.b", "letter": "b", "summary": "Stated bar for how fast/cheaply a new instance of the system's core extension point must be addable — if found, carry it into the extensibility check and judge actual extension cost against it directly. Absent is a risk, same as (a), and a distinct fact from it — not a duplicate."}
       ]
     },
     "vision-alignment": {

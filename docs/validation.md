@@ -162,6 +162,55 @@ gaps (missing `documentation` evidence-type bucket; the double-counting-avoidanc
 two check pairs instead of stating the general principle) — both fixed directly in
 `references/evidence-standard.md` and `references/evaluation-rubric.md`.
 
+## System-type coverage test: `examples/template-lib`
+
+Every fixture above classifies as `production-service` (`sample-service`, `clean-service`) or
+`cli-tool` (`minimal-cli-tool`) — zero coverage on `library`, despite it having a genuinely
+different suppression profile from `cli-tool`: `rubric_manifest.json`'s `system_type_overrides`
+marks `scale-requirements`/`observability`/`reliability-resilience` informational for `library`,
+but (unlike `cli-tool`) leaves `scalability` and `change-safety` mandatory.
+[`examples/template-lib`](../examples/template-lib) is a small embeddable Java templating library
+(no server, no `main`, `java-library`/`maven-publish` Gradle plugins) with real planted issues in
+exactly the dimensions that should stay mandatory: a hardcoded, non-overridable cache-size ceiling
+(`scalability`), two breaking API changes shipped as non-major version bumps with no deprecation
+cycle (`change-safety`), an unsandboxed template-path resolution (`security-boundaries`), and a
+helper-dispatch mechanism implemented two structurally different ways (`extensibility`). See
+[`examples/template-lib.expected.md`](../examples/template-lib.expected.md) for the full pass bar
+and the actual first-run result.
+
+One cold run (fresh agent, no memory), `full` mode: `system_type` classified `library`, confidence
+**high** — matched. `validate_findings.py`: `OK (16 findings, 39 checks, 0 warnings)`. **16
+findings** (8 risk, 4 confirmed, 2 misaligned, 2 strength), **27/27 mandatory checks covered
+(100%)**. Every planted issue survived as a finding under the expected dimension; every suppressed
+dimension (`scale-requirements`/`observability`/`reliability-resilience`) correctly resolved
+`not-applicable` rather than manufacturing risk from a throughput/observability concept that
+doesn't apply to in-process code with no I/O of its own.
+
+One real mismatch, one real process gap, both fixed the same session:
+- **`maintainability.a`** came back `not-applicable` (fixture was still untracked, zero git history,
+  at run time) instead of this repo's established `clean`/low-`risk`-with-caveat convention for thin
+  history. `evaluation-rubric.md`'s Maintainability checklist didn't say so explicitly before this
+  run — now it does (bus-factor concept always exists once there's any code and any author; thin
+  history caps confidence, it doesn't make the check `not-applicable`).
+- **`extensibility-requirements.b`** didn't state what an absent cost-bar should score as (unlike
+  `.a`, explicit that absence is a risk) — now explicit, mirroring `.a`, both fixed in
+  `evaluation-rubric.md` and `rubric_manifest.json`.
+- The fixture's own `README.md` originally carried a planted-issues table and "used to test the
+  skill" framing inside the audited repo itself — a second answer key beyond
+  `template-lib.expected.md`, contradicting this project's own fixture-circularity-avoidance
+  discipline (only `sample-service`'s README, written before that discipline existed, still has this
+  same drift, not yet backfilled). The cold-test agent caught and disclosed this itself, verified
+  every finding independently against real `file:line` evidence regardless, and the result was kept
+  on that basis — but the README was rewritten to stay purely in-universe so a future run against
+  this fixture isn't exposed to it.
+- This run's own expected-outcome table had a defect of its own: it hedged two `change-safety`
+  facts as landing on "`.a` and/or `.d`" / "`.a` and/or `.b`" — a real tension with
+  evaluation-rubric.md's "checks aren't interchangeable" rule that the cold-test agent correctly
+  flagged. Resolved by committing `change-safety.a` as the sole owner of both facts (two independent
+  findings under one check, per that check's own "list them all" pattern), with `.b`/`.c`/`.d`/`.e`
+  `not-applicable` for a library with no deploy/migration/rollout surface — not a rubric bug, a
+  fixture-doc bug.
+
 ## Known limitations, disclosed rather than hidden
 
 **Phrasing rule recurrence:** a phrasing rule exists (state findings as direct facts, not as an
