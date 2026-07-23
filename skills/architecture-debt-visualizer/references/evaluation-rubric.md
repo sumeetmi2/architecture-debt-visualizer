@@ -159,13 +159,18 @@ that's a fully reproducible, fully covered, genuinely clean result, not evidence
 rushed.
 
 **When one check's prerequisite is itself absent, downstream checks resolve `not-applicable` citing
-the upstream absence — they don't restate the same risk a second time.** Several checks are chained
-by design (`vision-alignment.b` needs `vision-alignment.a`'s vision content to exist before it can
-compare decisions against it; `data-architecture.f`'s forward-readiness check needs the same vision
-content to know what's coming). When the prerequisite check already recorded the absence as a
-`risk`, mark the dependent check `not-applicable` with a reason like *"no vision doc content exists
-to compare against — see vision-alignment.a"* rather than either leaving it `not-assessed` or
-logging a second, redundant risk finding about the same missing doc.
+the upstream absence — they don't restate the same risk a second time.** This is a general
+principle, not limited to any specific pair of checks — it applies whenever two checks would
+otherwise flag the same underlying gap from two different angles. Two named instances it's
+known to apply to: `vision-alignment.b` needs `vision-alignment.a`'s vision content to exist
+before it can compare decisions against it; `data-architecture.f`'s forward-readiness check needs
+the same vision content to know what's coming; `observability.b`'s message-processing-failure
+visibility defers to `reliability-resilience.e`'s recovery-expectations check when both would
+otherwise cite the same missing DLQ-reprocessing path. When a prerequisite (or a check covering
+the same gap from another dimension) already recorded the absence as a `risk`, mark the dependent
+check `not-applicable` with a reason like *"no vision doc content exists to compare against — see
+vision-alignment.a"* rather than either leaving it `not-assessed` or logging a second, redundant
+risk finding about the same missing doc/path.
 
 **Every lettered check is individually mandatory — not a menu to pick from, and not interchangeable
 with another check in the same dimension.** A measured failure mode from the old rubric: two

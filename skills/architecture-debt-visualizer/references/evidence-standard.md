@@ -49,7 +49,11 @@ finding:
   without confirming call semantics); `low` for anything resting on an assumption you couldn't
   verify in-repo.
 - `evidence_type` — array from: `direct-code`, `schema`, `configuration`, `git-history`,
-  `negative-search`, `external-dependency`, `runtime-only`.
+  `negative-search`, `external-dependency`, `runtime-only`, `documentation`.
+- `documentation` — the finding rests on prose in a doc file, not on code (e.g. a stated scale
+  target, a versioning policy, a vision statement). Common for `scale-requirements`,
+  `extensibility-requirements`, and `vision-alignment` findings, which are inherently doc-sourced.
+  Cite the doc file/line the same way `direct-code` cites a code file/line.
 - `limitations` — free-text array, e.g. `["Runtime infrastructure configuration is not stored in
   this repository."]`. Empty array if none.
 

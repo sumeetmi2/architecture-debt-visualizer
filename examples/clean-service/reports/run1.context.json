@@ -1,0 +1,15 @@
+{
+  "system_type": "production-service",
+  "criticality": "customer-facing",
+  "lifecycle": "active",
+  "deployment_model": "multi-instance-service",
+  "data_sensitivity": "none",
+  "expected_scale": "100 requests/second peak across both HTTP endpoints; 200 messages/second sustained on click-events; 2x growth expected within 12 months (docs/technical-vision.md, Scale & Extensibility Targets)",
+  "confidence": "medium",
+  "classification_evidence": [
+    "LinkResource exposes a versioned REST API (/api/v1) with real HTTP verbs (POST create, GET resolve); AuthenticationFilter is a global JAX-RS @Provider request filter; ClickEventConsumer is a Kafka @Incoming consumer with env-overridable concurrency and DLQ config; LinkExpiryJob is a @Scheduled job with an env-overridable interval — this is a running, deployed service shape (HTTP server + message consumer + scheduled worker), not a library or CLI tool.",
+    "sql/001-links.sql defines a partitioned, indexed production-style table (PARTITION BY RANGE COLUMNS, unique indexes backing idempotency and lookup) — real persistence schema, not a toy example.",
+    "docs/technical-vision.md states concrete throughput/latency targets (100 rps peak, 200 msg/s sustained, p99<150ms) and a growth horizon (2x in 12 months), consistent with an actively-scoped production service rather than a prototype.",
+    "build.gradle's header comment states 'Illustrative only — not a buildable project ... nothing to compile or run here,' and every repository/service method body is `throw new UnsupportedOperationException(\"illustrative sample, not wired up\")`. Per references/system-classification.md's guidance, an illustrative/non-buildable teaching fixture still classifies by architectural shape rather than by this disclaimer, so system_type is production-service; the disclaimer (and the fact persistence is never actually wired up) is why confidence is medium rather than high, not a reason to reclassify as prototype — there is no WIP/experimental/spike language anywhere in the docs, and the vision doc treats this as a real, ongoing system with a stated future roadmap."
+  ]
+}

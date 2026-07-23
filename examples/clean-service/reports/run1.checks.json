@@ -1,0 +1,309 @@
+{
+  "checks": [
+    {
+      "id": "scale-requirements.a",
+      "dimension": "scale-requirements",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f20"]
+    },
+    {
+      "id": "scale-requirements.b",
+      "dimension": "scale-requirements",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f21"]
+    },
+    {
+      "id": "scale-requirements.c",
+      "dimension": "scale-requirements",
+      "status": "clean",
+      "scope": ["scalability.a", "performance-cost.a"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 5, "note": "100 rps / 200 msg/s target and 150ms latency budget carried forward into scalability.a and observability.a findings below"}
+      ]
+    },
+    {
+      "id": "extensibility-requirements.a",
+      "dimension": "extensibility-requirements",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f22"]
+    },
+    {
+      "id": "extensibility-requirements.b",
+      "dimension": "extensibility-requirements",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f23"]
+    },
+    {
+      "id": "vision-alignment.a",
+      "dimension": "vision-alignment",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md"],
+      "confidence": "high",
+      "finding_ids": ["f24"]
+    },
+    {
+      "id": "vision-alignment.b",
+      "dimension": "vision-alignment",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md", "ClickEventConsumer", "LinkService", "sql/001-links.sql"],
+      "confidence": "high",
+      "finding_ids": ["f25"]
+    },
+    {
+      "id": "data-architecture.a",
+      "dimension": "data-architecture",
+      "status": "strength",
+      "scope": ["Link", "sql/001-links.sql"],
+      "confidence": "high",
+      "finding_ids": ["f26"]
+    },
+    {
+      "id": "data-architecture.b",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-links.sql", "sql/002-add-tag-column.sql"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "sql/001-links.sql", "line": 1, "note": "reviewed all 10 Link columns — consistent camelCase naming matching entity field names exactly; no naming-convention shift or near-duplicate column cluster; tag (added later) follows the same convention"}
+      ]
+    },
+    {
+      "id": "data-architecture.c",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["sql/001-links.sql", "sql/002-add-tag-column.sql"],
+      "reason": "Single-table schema with zero related tables — grep for FOREIGN KEY/REFERENCES across both DDL files found none. There is no foreign-key relationship to have gotten right or wrong yet; data-model.md explicitly defers the FK-vs-app-level-convention decision to when a second table is added."
+    },
+    {
+      "id": "data-architecture.d",
+      "dimension": "data-architecture",
+      "status": "strength",
+      "scope": ["sql/001-links.sql"],
+      "confidence": "high",
+      "finding_ids": ["f27"]
+    },
+    {
+      "id": "data-architecture.e",
+      "dimension": "data-architecture",
+      "status": "not-applicable",
+      "scope": ["sql/001-links.sql", "sql/002-add-tag-column.sql"],
+      "reason": "No monetary/currency fields exist anywhere in this schema (data-model.md line 18, confirmed against all 10 Link columns) — there is no decimal-vs-float/currency type-choice decision to evaluate."
+    },
+    {
+      "id": "data-architecture.f",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["docs/technical-vision.md", "sql/001-links.sql"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 49, "note": "the only concretely-named next feature (link-shared events) is a new consumer, not a new entity/table, so current Link schema has no specific forward requirement to anticipate yet"}
+      ]
+    },
+    {
+      "id": "data-architecture.g",
+      "dimension": "data-architecture",
+      "status": "clean",
+      "scope": ["sql/001-links.sql", "sql/002-add-tag-column.sql"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "sql/001-links.sql", "line": 1, "note": "all columns are scalar/typed (BIGINT, DATE, VARCHAR, DATETIME) — no JSON/TEXT blob column duplicating another entity's structured data"}
+      ]
+    },
+    {
+      "id": "scalability.a",
+      "dimension": "scalability",
+      "status": "clean",
+      "scope": ["application.properties", "AnalyticsClient"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "src/main/resources/application.properties", "line": 6, "note": "click-events concurrency env-overridable, default 3"},
+        {"file": "src/main/resources/application.properties", "line": 10, "note": "expiry job interval env-overridable, default 1h"},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 17, "note": "AnalyticsClient's timeout/circuit-breaker thresholds are literal (not ${VAR}-templated), but they sit on the analytics-forwarding path, which technical-vision.md explicitly states carries 'no hard SLA' — a literal value there doesn't threaten the one path (GET resolve) that does carry a stated latency budget"}
+      ]
+    },
+    {
+      "id": "performance-cost.a",
+      "dimension": "performance-cost",
+      "status": "clean",
+      "scope": ["AnalyticsClient"],
+      "confidence": "high",
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 17, "note": "sole external call in the repo (per its own javadoc: 'The only outbound call this service makes to another system') has timeout+circuit-breaker guardrails; no second external call exists in-repo to compare it against for a consistency gap"}
+      ]
+    },
+    {
+      "id": "extensibility.a",
+      "dimension": "extensibility",
+      "status": "strength",
+      "scope": ["docs/patterns/add-event-type.md", "ClickEventConsumer"],
+      "confidence": "high",
+      "finding_ids": ["f28"]
+    },
+    {
+      "id": "extensibility.b",
+      "dimension": "extensibility",
+      "status": "not-applicable",
+      "scope": ["whole repo"],
+      "reason": "The whole codebase has exactly one instance of every component type (1 REST resource, 1 consumer, 1 scheduled job, 1 external client, 1 entity) — there is nothing structurally analogous elsewhere to compare for a same-shape-modeled-differently inconsistency."
+    },
+    {
+      "id": "observability.a",
+      "dimension": "observability",
+      "status": "risk",
+      "scope": ["LinkResource", "ClickEventConsumer", "LinkExpiryJob"],
+      "confidence": "high",
+      "finding_ids": ["f29", "f30", "f31"]
+    },
+    {
+      "id": "observability.b",
+      "dimension": "observability",
+      "status": "not-applicable",
+      "scope": ["click-events-dlq"],
+      "reason": "No code in this repository consumes or reprocesses messages from click-events-dlq — the DLQ failure-recovery path's mechanism (or lack thereof) is assessed as a recovery-mechanism gap under reliability-resilience.e; restating the same absence here as a distinct observability finding would duplicate that finding rather than surface a new fact."
+    },
+    {
+      "id": "maintainability.a",
+      "dimension": "maintainability",
+      "status": "risk",
+      "scope": ["whole repo git history"],
+      "confidence": "low",
+      "finding_ids": ["f32"]
+    },
+    {
+      "id": "maintainability.b",
+      "dimension": "maintainability",
+      "status": "not-applicable",
+      "scope": ["docs/patterns/add-event-type.md"],
+      "reason": "extensibility.a found 1/1 adherence to the consumer pattern doc (a single real instance). With no second instance yet, there is no inconsistency whose ongoing replication cost could be measured."
+    },
+    {
+      "id": "reliability-resilience.a",
+      "dimension": "reliability-resilience",
+      "status": "strength",
+      "scope": ["LinkService", "LinkExpiryJob", "ClickEventConsumer"],
+      "confidence": "high",
+      "finding_ids": ["f33"]
+    },
+    {
+      "id": "reliability-resilience.b",
+      "dimension": "reliability-resilience",
+      "status": "strength",
+      "scope": ["AnalyticsClient"],
+      "confidence": "high",
+      "finding_ids": ["f34"]
+    },
+    {
+      "id": "reliability-resilience.c",
+      "dimension": "reliability-resilience",
+      "status": "strength",
+      "scope": ["ClickEventConsumer", "application.properties"],
+      "confidence": "high",
+      "finding_ids": ["f35"]
+    },
+    {
+      "id": "reliability-resilience.d",
+      "dimension": "reliability-resilience",
+      "status": "strength",
+      "scope": ["ClickEventConsumer", "AnalyticsClient"],
+      "confidence": "high",
+      "finding_ids": ["f36"]
+    },
+    {
+      "id": "reliability-resilience.e",
+      "dimension": "reliability-resilience",
+      "status": "risk",
+      "scope": ["click-events-dlq"],
+      "confidence": "medium",
+      "finding_ids": ["f37"]
+    },
+    {
+      "id": "change-safety.a",
+      "dimension": "change-safety",
+      "status": "strength",
+      "scope": ["docs/technical-vision.md", "LinkResource"],
+      "confidence": "high",
+      "finding_ids": ["f38"]
+    },
+    {
+      "id": "change-safety.b",
+      "dimension": "change-safety",
+      "status": "strength",
+      "scope": ["sql/002-add-tag-column.sql"],
+      "confidence": "high",
+      "finding_ids": ["f39"]
+    },
+    {
+      "id": "change-safety.c",
+      "dimension": "change-safety",
+      "status": "not-applicable",
+      "scope": ["ClickEventConsumer"],
+      "reason": "click-events' message payload is a bare String (the short code), not a structured/versioned schema — there is no 'tolerates unknown fields' question for a scalar payload. The only other planned channel (link-shared) doesn't exist in code yet to check either."
+    },
+    {
+      "id": "change-safety.d",
+      "dimension": "change-safety",
+      "status": "strength",
+      "scope": ["sql/002-add-tag-column.sql", "Link"],
+      "confidence": "medium",
+      "finding_ids": ["f40"]
+    },
+    {
+      "id": "change-safety.e",
+      "dimension": "change-safety",
+      "status": "risk",
+      "scope": ["whole repo"],
+      "confidence": "high",
+      "finding_ids": ["f41"]
+    },
+    {
+      "id": "security-boundaries.a",
+      "dimension": "security-boundaries",
+      "status": "strength",
+      "scope": ["LinkResource", "AuthenticationFilter"],
+      "confidence": "high",
+      "finding_ids": ["f42"]
+    },
+    {
+      "id": "security-boundaries.b",
+      "dimension": "security-boundaries",
+      "status": "strength",
+      "scope": ["application.properties"],
+      "confidence": "high",
+      "finding_ids": ["f43"]
+    },
+    {
+      "id": "security-boundaries.c",
+      "dimension": "security-boundaries",
+      "status": "not-applicable",
+      "scope": ["whole repo"],
+      "reason": "No PII/financial fields exist anywhere in the schema (data-model.md, confirmed against DDL) and no logging statements exist anywhere in this codebase (grepped for Logger/LOG./log./System.out/println — zero matches) — there is nothing sensitive and no log output to audit for redaction."
+    },
+    {
+      "id": "security-boundaries.d",
+      "dimension": "security-boundaries",
+      "status": "clean",
+      "scope": ["LinkResource"],
+      "confidence": "medium",
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 30, "note": "create request body is @Valid with @NotBlank + @Pattern(regexp=\"^https?://.+\") on targetUrl"},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 46, "note": "resolve()'s @PathParam(\"code\") has no explicit format/length constraint, unlike create's body — but this is a read-only, 404-safe lookup key (VARCHAR(12) column) with no evidenced injection vector; LinkRepository's actual query mechanism is an unwired stub, so downstream usage of the raw string couldn't be verified either way. Not elevated to a risk finding: the asymmetry is real but the concrete, checkable harm is not."}
+      ]
+    },
+    {
+      "id": "security-boundaries.e",
+      "dimension": "security-boundaries",
+      "status": "not-applicable",
+      "scope": ["whole repo"],
+      "reason": "The entire HTTP surface is 2 endpoints (create, read-only resolve) — neither destructive/bulk/admin. The one bulk state-changing operation (LinkExpiryJob's expire sweep) is an automated internal scheduled job, not a user-triggered privileged action, so there is no privileged-operation gating decision to evaluate."
+    }
+  ]
+}

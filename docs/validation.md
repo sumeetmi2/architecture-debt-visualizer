@@ -139,6 +139,29 @@ from the code directly. It also caught a real, unplanted mistake in the "good" d
 see [`examples/sample-service/README.md`](../examples/sample-service/README.md#docs-good-run) for
 details.
 
+## False-positive test: `examples/clean-service`
+
+Every fixture above is either deliberately debt-laden (`sample-service`) or too small to have much
+evaluation surface (`minimal-cli-tool`). Neither answers the question that matters most for a tool
+whose whole job is flagging risk: **does it over-flag on real, non-trivial, deliberately
+well-built code?** [`examples/clean-service`](../examples/clean-service) is a same-scale,
+same-shape sibling of `sample-service` (REST API, message consumer, scheduled job, real schema)
+where every pattern planted as debt in `sample-service` was instead built correctly — real
+idempotency keys, circuit breaker + fallback on the one outbound call, DLQ-configured consumer,
+input validation, versioned API, secrets from env vars, matching PK/entity, partition catch-all
+with no dated horizon. See [`examples/clean-service.expected.md`](../examples/clean-service.expected.md)
+for the full pass bar and the actual first-run result.
+
+One cold run (fresh agent, no memory), `full` mode: **43 findings — 19 confirmed, 18 strength, 0
+misaligned, 0 gap, 6 risk (0 high, 1 medium, 5 low)**, audit coverage **37/37 (100%)**. The single
+medium-severity risk was verified legitimate on review, not a stretch: a documented p99&lt;150ms
+SLA on one endpoint with zero latency instrumentation to check it against — a real, evidenced gap,
+not manufactured to hit a quota. Zero high-severity findings, zero misaligned/gap reconciliation
+results, against code deliberately built to have none. This run surfaced two real rubric wording
+gaps (missing `documentation` evidence-type bucket; the double-counting-avoidance rule only named
+two check pairs instead of stating the general principle) — both fixed directly in
+`references/evidence-standard.md` and `references/evaluation-rubric.md`.
+
 ## Known limitations, disclosed rather than hidden
 
 **Phrasing rule recurrence:** a phrasing rule exists (state findings as direct facts, not as an

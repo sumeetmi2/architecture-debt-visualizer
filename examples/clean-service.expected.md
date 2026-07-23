@@ -50,3 +50,34 @@ flawless, just deliberately not debt-laden where the checklist looks):
 If a run instead produces a long list of `high`-severity risk findings against patterns that match
 the table above, that's a false positive worth investigating — this fixture's whole purpose is
 catching exactly that.
+
+## Actual first-run result (`reports/run1.*`)
+
+Cold, no-memory agent, `full` mode. Result: **43 findings — 19 confirmed, 18 strength, 0
+misaligned, 0 gap, 6 risk (0 high, 1 medium, 5 low)**. Audit coverage **37/37 (100%)**, debt index
+**97/100**. `validate_findings.py`: `OK (43 findings, 37 checks, 0 warnings)`.
+
+`system_type` classified `production-service`, confidence **medium** — real HTTP/Kafka/scheduled-job
+entry points and a production-shaped schema outweighed the fixture's non-buildable `build.gradle`
+and stub service methods, but that tension is exactly why confidence landed at medium, not high.
+Matches `system-classification.md`'s explicit guidance that illustrative fixtures still classify by
+architectural shape.
+
+The one medium risk (`f29`, `observability.a`): `LinkResource.java`'s `GET /api/v1/links/{code}`
+has only a request counter, no `Timer`/histogram — despite `technical-vision.md` stating a specific
+p99&lt;150ms SLA for that exact endpoint. Verified legitimate, not planted: real doc/code gap, not
+a stretch. This is the fixture's one deliberate gap in disguise — everything else in the table above
+held.
+
+The 5 low risks were all similarly evidence-backed (bus-factor, job/consumer observability gaps, no
+DLQ-reprocessing path, no feature-flag mechanism) — none disputed on review.
+
+8 checks correctly resolved `not-applicable` (no second table to FK, no monetary fields, single
+instance of every component with nothing to compare against, no destructive endpoints, etc.) — see
+`reports/run1.checks.json` for the full list.
+
+Two rubric wording gaps this run surfaced, fixed directly in the reference docs: `evidence-standard.md`
+was missing an `evidence_type` bucket for doc-sourced (not code-sourced) evidence — added
+`documentation`. And the "don't double-count a chained gap across two checks" rule was only spelled
+out for two named check pairs — generalized to state it's a general principle, with a third instance
+(`observability.b` / `reliability-resilience.e`) added as a named example.

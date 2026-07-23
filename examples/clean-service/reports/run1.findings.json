@@ -1,0 +1,865 @@
+{
+  "title": "Architecture Debt Report — clean-service",
+  "doc_sources": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/boundaries.md",
+    "docs/data-model.md",
+    "docs/technical-vision.md",
+    "docs/patterns/add-event-type.md"
+  ],
+  "findings": [
+    {
+      "id": "f1",
+      "claim": "resource/LinkResource is the REST API for creating and resolving links, versioned as /api/v1",
+      "doc_source": "docs/architecture.md",
+      "doc_location": "Key Components table, resource/LinkResource row (line 10); corroborated by Data flow items 1-2 (lines 18-19)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.resource"],
+      "evidence": [
+        {"file": "docs/architecture.md", "line": 10, "note": "component table row"},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 20, "note": "@Path(\"/api/v1/links\")"},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 34, "note": "@POST create"},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 43, "note": "@GET @Path(\"/{code}\") resolve"}
+      ],
+      "explanation": "LinkResource is annotated @Path(\"/api/v1/links\") with a @POST create method and a @GET /{code} resolve method, matching the doc's component description exactly.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f2",
+      "claim": "security/AuthenticationFilter provides global request auth, applied to every endpoint by construction",
+      "doc_source": "docs/architecture.md",
+      "doc_location": "Key Components table, security/AuthenticationFilter row (line 11)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.security"],
+      "evidence": [
+        {"file": "docs/architecture.md", "line": 11},
+        {"file": "src/main/java/com/example/linkshortener/security/AuthenticationFilter.java", "line": 16, "note": "@Provider class, no @NameBinding — applies globally to every JAX-RS resource by default per spec, not opt-in per endpoint"}
+      ],
+      "explanation": "AuthenticationFilter is a @Provider ContainerRequestFilter with no @NameBinding restricting its scope, so it applies to every resource in the deployment by construction, matching the doc's claim.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f3",
+      "claim": "consumer/ClickEventConsumer consumes click-events, increments the click counter, and forwards to analytics",
+      "doc_source": "docs/architecture.md",
+      "doc_location": "Key Components table, consumer/ClickEventConsumer row (line 12); Data flow item 3 (lines 20-22)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "docs/architecture.md", "line": 12},
+        {"file": "docs/architecture.md", "line": 20},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 33, "note": "@Incoming(\"click-events\") onClickEvent"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 37, "note": "linkService.recordClick(shortCode)"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 38, "note": "analyticsClient.forwardClickEvent(shortCode)"}
+      ],
+      "explanation": "onClickEvent calls linkService.recordClick then analyticsClient.forwardClickEvent, matching both the component table entry and the data-flow item.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f4",
+      "claim": "client/AnalyticsClient makes a best-effort outbound call to the analytics backend with timeout + circuit breaker + fallback",
+      "doc_source": "docs/architecture.md",
+      "doc_location": "Key Components table, client/AnalyticsClient row (line 13)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.client"],
+      "evidence": [
+        {"file": "docs/architecture.md", "line": 13},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 17, "note": "@Timeout(value = 500, unit = MILLIS)"},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 18, "note": "@CircuitBreaker(requestVolumeThreshold=10, failureRatio=0.5, delay=30, SECONDS)"},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 19, "note": "@Fallback(fallbackMethod=\"recordSkipped\")"}
+      ],
+      "explanation": "All three guardrails named in the doc are present as MicroProfile Fault Tolerance annotations on forwardClickEvent.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f5",
+      "claim": "scheduler/LinkExpiryJob runs an hourly (configurable) sweep marking expired links, and is idempotent",
+      "doc_source": "docs/architecture.md",
+      "doc_location": "Key Components table, scheduler/LinkExpiryJob row (line 14); Data flow item 4 (line 23)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.scheduler"],
+      "evidence": [
+        {"file": "docs/architecture.md", "line": 14},
+        {"file": "docs/architecture.md", "line": 23},
+        {"file": "src/main/java/com/example/linkshortener/scheduler/LinkExpiryJob.java", "line": 26, "note": "@Scheduled(every = \"{linkshortener.expiry-job.interval:1h}\")"},
+        {"file": "src/main/java/com/example/linkshortener/scheduler/LinkExpiryJob.java", "line": 11, "note": "javadoc: idempotent by construction via WHERE status != 'expired'"}
+      ],
+      "explanation": "Interval defaults to 1h and is env-overridable; javadoc and the repository's WHERE-clause design back the idempotency claim.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f6",
+      "claim": "No component in this service performs a database write and a message publish as one logical operation — there is no dual-write/outbox question anywhere in this design",
+      "doc_source": "docs/architecture.md",
+      "doc_location": "Data flow section, closing paragraph (lines 25-28)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/architecture.md", "line": 25},
+        {"note": "repo-wide grep for @Outgoing / Producer / KafkaProducer / Emitter across src/ returned zero matches — no message-publishing code exists anywhere in this service"}
+      ],
+      "explanation": "This is a strong, repo-wide negative claim; a targeted grep for every plausible message-producer construct in the messaging library actually used (SmallRye Reactive Messaging's @Outgoing / Emitter) found none, confirming the doc's claim.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -rn '@Outgoing|Producer|KafkaProducer|Emitter' src/ — no matches"],
+      "limitations": []
+    },
+    {
+      "id": "f7",
+      "claim": "POST /api/v1/links requires the X-Auth-Credential header (checked by AuthenticationFilter) and is idempotent via the Idempotency-Key header",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "HTTP API table, POST row (line 9)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.resource", "com.example.linkshortener.security"],
+      "evidence": [
+        {"file": "docs/boundaries.md", "line": 9},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 37, "note": "@HeaderParam(\"Idempotency-Key\") @NotBlank"},
+        {"file": "src/main/java/com/example/linkshortener/security/AuthenticationFilter.java", "line": 25, "note": "ctx.getHeaderString(\"X-Auth-Credential\")"}
+      ],
+      "explanation": "Both the header names and behaviors match exactly.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f8",
+      "claim": "GET /api/v1/links/{code} requires the same X-Auth-Credential auth and is idempotent (read-only)",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "HTTP API table, GET row (line 10)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.resource"],
+      "evidence": [
+        {"file": "docs/boundaries.md", "line": 10},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 46, "note": "resolve() — read-only, no state mutation"}
+      ],
+      "explanation": "resolve() performs no write; the read-only-idempotent claim holds.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f9",
+      "claim": "Both endpoints are covered by the same global auth filter — there is no endpoint in this service that skips it",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "HTTP API section, closing sentence (lines 12-13)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.resource", "com.example.linkshortener.security"],
+      "evidence": [
+        {"file": "docs/boundaries.md", "line": 12},
+        {"note": "repo-wide search found exactly one @Path-annotated resource class (LinkResource, 2 endpoints) and one global @Provider ContainerRequestFilter (AuthenticationFilter) with no @NameBinding restricting its scope — a 'complete list' claim verified by confirming no other resource class or auth-skip mechanism exists"}
+      ],
+      "explanation": "A 'no exceptions' claim is only as strong as the search behind it; verified by enumerating every @Path class in the repo (just one) rather than trusting the doc's own completeness assertion.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": [
+        "grep -rl '@Path' src/ — only LinkResource.java",
+        "grep -rn 'NameBinding' src/ — none found, confirming AuthenticationFilter is unscoped/global"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f10",
+      "claim": "The click-events consumer uses failure-strategy=dead-letter-queue (topic click-events-dlq) with concurrency ${CLICK_EVENTS_CONCURRENCY:3}",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "Message Consumers table (line 19)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "docs/boundaries.md", "line": 19},
+        {"file": "src/main/resources/application.properties", "line": 6, "note": "concurrency=${CLICK_EVENTS_CONCURRENCY:3}"},
+        {"file": "src/main/resources/application.properties", "line": 7, "note": "failure-strategy=dead-letter-queue"},
+        {"file": "src/main/resources/application.properties", "line": 8, "note": "dead-letter-queue.topic=click-events-dlq"}
+      ],
+      "explanation": "Exact match between the doc's table and application.properties.",
+      "confidence": "high",
+      "evidence_type": ["configuration", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f11",
+      "claim": "LinkExpiryJob runs on interval ${EXPIRY_JOB_INTERVAL:1h} and is idempotent (re-running against already-expired rows is a no-op)",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "Scheduled Jobs table (line 25)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.scheduler"],
+      "evidence": [
+        {"file": "docs/boundaries.md", "line": 25},
+        {"file": "src/main/resources/application.properties", "line": 10, "note": "linkshortener.expiry-job.interval=${EXPIRY_JOB_INTERVAL:1h}"},
+        {"file": "src/main/java/com/example/linkshortener/scheduler/LinkExpiryJob.java", "line": 26}
+      ],
+      "explanation": "Property name/default and @Scheduled expression match.",
+      "confidence": "high",
+      "evidence_type": ["configuration", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f12",
+      "claim": "AnalyticsClient.forwardClickEvent has a 500ms timeout, a circuit breaker (10-request window, 50% failure ratio, 30s open), and a fallback that never blocks the click-counting path",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "External calls table (line 31)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.client", "com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "docs/boundaries.md", "line": 31},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 17},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 18},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 37, "note": "linkService.recordClick(shortCode) runs BEFORE analyticsClient.forwardClickEvent(shortCode) at line 38 — the durable click-count write always happens first, so the fallback can never block or undo it"}
+      ],
+      "explanation": "The exact numeric thresholds match the doc, and the call-order in ClickEventConsumer confirms the 'never blocks the click-counting path' half of the claim, not just the annotation values.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f13",
+      "claim": "Link is a single table, partitioned by createdDate with a MAXVALUE catch-all partition",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (lines 5-6)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/data-model.md", "line": 5},
+        {"file": "sql/001-links.sql", "line": 12, "note": "PARTITION BY RANGE COLUMNS(createdDate)"},
+        {"file": "sql/001-links.sql", "line": 15, "note": "PARTITION pmax VALUES LESS THAN (MAXVALUE)"}
+      ],
+      "explanation": "DDL matches the doc's description exactly.",
+      "confidence": "high",
+      "evidence_type": ["schema", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f14",
+      "claim": "Link's composite primary key (createdDate, id) is matched exactly by the JPA @EmbeddedId LinkId — no identity mismatch",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (lines 8-9)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.entity"],
+      "evidence": [
+        {"file": "docs/data-model.md", "line": 8},
+        {"file": "sql/001-links.sql", "line": 11, "note": "PRIMARY KEY (createdDate, id)"},
+        {"file": "src/main/java/com/example/linkshortener/entity/Link.java", "line": 19, "note": "@EmbeddedId private LinkId id;"},
+        {"file": "src/main/java/com/example/linkshortener/entity/Link.java", "line": 30, "note": "record LinkId(LocalDate createdDate, Long id)"}
+      ],
+      "explanation": "The DDL composite key and the JPA @EmbeddedId's two fields (createdDate, id) line up column-for-column.",
+      "confidence": "high",
+      "evidence_type": ["schema", "direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f15",
+      "claim": "shortCode and idempotencyKey are both unique-indexed — shortCode backs lookups, idempotencyKey backs create-endpoint idempotency",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (lines 9-10)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/data-model.md", "line": 9},
+        {"file": "sql/001-links.sql", "line": 18, "note": "CREATE UNIQUE INDEX IdxShortCode ON Link (shortCode)"},
+        {"file": "sql/001-links.sql", "line": 19, "note": "CREATE UNIQUE INDEX IdxIdempotencyKey ON Link (idempotencyKey)"}
+      ],
+      "explanation": "Both unique indexes exist exactly as described.",
+      "confidence": "high",
+      "evidence_type": ["schema", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f16",
+      "claim": "tag is nullable, added in 002-add-tag-column.sql as an expand step, not yet enforced non-null",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (lines 11-12)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/data-model.md", "line": 11},
+        {"file": "sql/002-add-tag-column.sql", "line": 5, "note": "ALTER TABLE Link ADD COLUMN tag VARCHAR(64) NULL"}
+      ],
+      "explanation": "Migration file matches the doc's description exactly.",
+      "confidence": "high",
+      "evidence_type": ["schema", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f17",
+      "claim": "Link has no foreign keys — this is a single-table schema today",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (line 14)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/data-model.md", "line": 14},
+        {"note": "grep for FOREIGN KEY|REFERENCES across sql/001-links.sql and sql/002-add-tag-column.sql — zero matches in either file"}
+      ],
+      "explanation": "Confirmed by grepping every DDL file in the repo, not just eyeballing one table.",
+      "confidence": "high",
+      "evidence_type": ["schema", "negative-search"],
+      "searches_performed": ["grep -rn 'FOREIGN KEY|REFERENCES' sql/ — no matches"],
+      "limitations": []
+    },
+    {
+      "id": "f18",
+      "claim": "No monetary or currency fields exist in this schema",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section, closing line (line 18)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/data-model.md", "line": 18},
+        {"note": "all 10 Link columns reviewed (id, createdDate, shortCode, targetUrl, idempotencyKey, clickCount, expiresAt, status, createdAt, tag) — none are monetary/currency-typed"}
+      ],
+      "explanation": "Reviewed the full column list in both DDL files; nothing monetary.",
+      "confidence": "high",
+      "evidence_type": ["schema", "negative-search"],
+      "searches_performed": ["reviewed sql/001-links.sql and sql/002-add-tag-column.sql column-by-column — no DECIMAL/currency/amount/price columns present"],
+      "limitations": []
+    },
+    {
+      "id": "f19",
+      "claim": "Every channel in this service uses the dead-letter-queue failure strategy, not ignore, and the pattern doc's steps are followed by 1 of 1 real consumers today (ClickEventConsumer)",
+      "doc_source": "docs/patterns/add-event-type.md",
+      "doc_location": "Steps list (line 5) and closing note (lines 11-13)",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "docs/patterns/add-event-type.md", "line": 5},
+        {"file": "docs/patterns/add-event-type.md", "line": 11},
+        {"file": "src/main/resources/application.properties", "line": 7, "note": "failure-strategy=dead-letter-queue — the only consumer channel configured in this repo"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 22, "note": "the only @ApplicationScoped @Incoming consumer class in the repo"}
+      ],
+      "explanation": "Grep for @Incoming across src/ finds exactly one consumer, and application.properties has exactly one channel configured, DLQ-strategy — both claims are literally true, not just plausible.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f20",
+      "check_id": "scale-requirements.a",
+      "claim": "The team has documented concrete scale targets: 100 requests/second peak across both HTTP endpoints, 200 messages/second sustained on click-events, and a p99 under 150ms latency budget for the redirect-critical GET endpoint",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets (lines 5-9)",
+      "classification": "strength",
+      "dimension": "scale-requirements",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 5, "note": "target load: 100 rps peak, 200 msg/s sustained, 2x growth in 12 months"},
+        {"file": "docs/technical-vision.md", "line": 7, "note": "p99 under 150ms latency budget for GET /api/v1/links/{code}"}
+      ],
+      "explanation": "A stated throughput and latency target exists and is specific enough to calibrate every downstream scalability/observability judgment in this report — most repos audited by this skill have no such target at all, which is itself an absence-based risk when missing.",
+      "recommendation": "",
+      "confidence": "high",
+      "evidence_type": ["documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f21",
+      "check_id": "scale-requirements.b",
+      "claim": "technical-vision.md states an explicit growth horizon — 2x expected growth within 12 months — distinct from the raw throughput target",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Scale & Extensibility Targets (lines 5-6)",
+      "classification": "strength",
+      "dimension": "scale-requirements",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 5, "note": "'Expected growth: 2x within 12 months.'"}
+      ],
+      "explanation": "A concrete growth horizon exists, distinct from the point-in-time throughput target — this is the second, separately-checked signal scale-requirements.b asks for.",
+      "confidence": "high",
+      "evidence_type": ["documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f22",
+      "check_id": "extensibility-requirements.a",
+      "claim": "technical-vision.md names the next concrete consumer to be added (link-shared events) with an explicit cadence — one new event type expected per half-year",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Extensibility target bullet (lines 10-13); Future Direction (lines 49-51)",
+      "classification": "strength",
+      "dimension": "extensibility-requirements",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 10, "note": "'the team expects to support one new event type ... per half-year — the next candidate is link-shared events'"},
+        {"file": "docs/technical-vision.md", "line": 49}
+      ],
+      "explanation": "This is the 'fully stated' outcome for this check, not the named-but-no-timeline middle case — both a concrete next candidate and a cadence are given.",
+      "confidence": "high",
+      "evidence_type": ["documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f23",
+      "check_id": "extensibility-requirements.b",
+      "claim": "technical-vision.md states an explicit cost bar for the core extension point — each new event type should take under a day to add, given the existing consumer pattern",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Extensibility target bullet (lines 10-13)",
+      "classification": "strength",
+      "dimension": "extensibility-requirements",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 12, "note": "'wants each addition to take under a day given the existing consumer pattern'"}
+      ],
+      "explanation": "This is carried forward into extensibility.a's assessment: the one real consumer follows the documented steps exactly, so nothing observed contradicts the day-long bar, though only one data point exists to judge it against.",
+      "confidence": "high",
+      "evidence_type": ["documentation"],
+      "limitations": ["Only one real instance of the extension point exists, so the 'under a day' bar has not actually been exercised against a second, independent addition yet."]
+    },
+    {
+      "id": "f24",
+      "check_id": "vision-alignment.a",
+      "claim": "docs/technical-vision.md is a substantive, current vision document — scale targets, versioning/deprecation policy, an explicit design philosophy with rationale, named key architectural decisions, and a stated future direction",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "whole document",
+      "classification": "strength",
+      "dimension": "vision-alignment",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 1}
+      ],
+      "explanation": "The doc covers scale/extensibility targets, versioning policy, design philosophy with explicit trade-off rationale, named architectural decisions, and a future-direction section — it is not empty or pure scaffolding.",
+      "confidence": "high",
+      "evidence_type": ["documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f25",
+      "check_id": "vision-alignment.b",
+      "claim": "Three concrete, currently-implemented architecture decisions were checked against what technical-vision.md claims, and all three match: (1) no DB-write+message-publish pairing exists anywhere in the code, matching the stated 'no dual-write' decision; (2) Link's partition list ends in a MAXVALUE catch-all in the actual DDL, matching the stated 'partition catch-all, not a dated horizon' decision; (3) ClickEventConsumer's redelivery-driven double-count risk and LinkService's exact idempotency-key-backed creation both match the stated 'availability over exactness for clicks, exactness for creation' design philosophy",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Key Architectural Decisions (lines 38-45); Design Philosophy (lines 26-30)",
+      "classification": "strength",
+      "dimension": "vision-alignment",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.consumer", "com.example.linkshortener.service"],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 38},
+        {"file": "sql/001-links.sql", "line": 15, "note": "PARTITION pmax VALUES LESS THAN (MAXVALUE) — matches decision 2"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 16, "note": "javadoc documents the accepted double-count trade-off — matches decision 3"},
+        {"file": "src/main/java/com/example/linkshortener/service/LinkService.java", "line": 16, "note": "javadoc: idempotency-key-first creation — matches decision 3's 'exact' half"}
+      ],
+      "explanation": "Checked three separate, currently-live decisions against the vision doc rather than one; all three hold up under direct code inspection, not just doc cross-referencing.",
+      "confidence": "high",
+      "evidence_type": ["documentation", "direct-code", "schema"],
+      "limitations": []
+    },
+    {
+      "id": "f26",
+      "check_id": "data-architecture.a",
+      "claim": "Link's JPA @EmbeddedId LinkId(createdDate, id) matches the real DDL composite primary key (createdDate, id) exactly — no ORM/schema identity mismatch",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (line 8)",
+      "classification": "strength",
+      "dimension": "data-architecture",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.entity"],
+      "evidence": [
+        {"file": "sql/001-links.sql", "line": 11, "note": "PRIMARY KEY (createdDate, id)"},
+        {"file": "src/main/java/com/example/linkshortener/entity/Link.java", "line": 19},
+        {"file": "src/main/java/com/example/linkshortener/entity/Link.java", "line": 30, "note": "record LinkId(LocalDate createdDate, Long id)"}
+      ],
+      "explanation": "Hibernate's identity/equality/caching model is keyed on the exact same columns as the real relational key. This is precisely the class of bug (@Id-vs-DDL mismatch) this skill exists to catch when it's done wrong — here it's implemented correctly.",
+      "confidence": "high",
+      "evidence_type": ["schema", "direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f27",
+      "check_id": "data-architecture.d",
+      "claim": "Link's partition scheme uses a MAXVALUE catch-all partition instead of a fixed list of dated partitions, so no partition-maintenance job is required to avoid running out of partitions, and none exists",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section (line 5); technical-vision.md Key Architectural Decisions (lines 43-45)",
+      "classification": "strength",
+      "dimension": "data-architecture",
+      "severity": "medium",
+      "packages": [],
+      "evidence": [
+        {"file": "sql/001-links.sql", "line": 12},
+        {"file": "sql/001-links.sql", "line": 15, "note": "PARTITION pmax VALUES LESS THAN (MAXVALUE)"},
+        {"note": "grepped the codebase for a partition-maintenance job/script — none exists, and none is needed given the MAXVALUE catch-all"}
+      ],
+      "explanation": "The current partition list (p2026, p2027, pmax) comfortably covers today's date with no expiry risk, and the MAXVALUE catch-all means it never needs one — a deliberate avoidance of the maintenance-job dependency a fixed dated-partition horizon would create.",
+      "confidence": "high",
+      "evidence_type": ["schema", "negative-search"],
+      "searches_performed": ["grep -rniE 'partition' src/ — no partition-maintenance code found (none needed)"],
+      "limitations": []
+    },
+    {
+      "id": "f28",
+      "check_id": "extensibility.a",
+      "claim": "docs/patterns/add-event-type.md's 3-step 'how to add a consumer' pattern is followed exactly by the one real consumer that exists (ClickEventConsumer) — 1 of 1 instances, 100% adherence",
+      "doc_source": "docs/patterns/add-event-type.md",
+      "doc_location": "whole document",
+      "classification": "strength",
+      "dimension": "extensibility",
+      "severity": "low",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "docs/patterns/add-event-type.md", "line": 3, "note": "step 1: properties block w/ concurrency + DLQ"},
+        {"file": "src/main/resources/application.properties", "line": 4, "note": "connector/topic/concurrency/failure-strategy/dlq-topic all present"},
+        {"file": "docs/patterns/add-event-type.md", "line": 6, "note": "step 2: @ApplicationScoped, single @Incoming, Timer.Sample, processed+failed counters"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 33, "note": "onClickEvent matches step 2 exactly"},
+        {"file": "docs/patterns/add-event-type.md", "line": 9, "note": "step 3: add row to boundaries.md"},
+        {"file": "docs/boundaries.md", "line": 19, "note": "click-events row present"}
+      ],
+      "explanation": "Checked all three documented steps against the one real instance individually rather than assuming adherence from the doc's own claim; all three hold.",
+      "confidence": "high",
+      "evidence_type": ["documentation", "direct-code", "configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f29",
+      "check_id": "observability.a",
+      "claim": "GET /api/v1/links/{code} has no latency or duration metric anywhere in its handler, despite technical-vision.md stating an explicit p99 under 150ms latency budget for this exact endpoint — only a request counter exists, so there is no way to verify the stated SLA is being met",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Latency budget bullet (lines 7-9)",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.resource"],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 7, "note": "p99 under 150ms budget stated for GET /api/v1/links/{code}"},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 46, "note": "resolve() method — only registry.counter(\"link_resolve_requests_total\").increment() at line 47; no Timer/duration metric anywhere in this class"}
+      ],
+      "explanation": "LinkResource.java (read in full) contains exactly two metrics, both plain counters (link_create_requests_total, link_resolve_requests_total) — no Timer/histogram on either handler, and no failure/error counter distinguishing successful from failed requests. The one endpoint carrying a concrete, numeric latency commitment in the vision doc has zero instrumentation capable of measuring latency, so an operator cannot currently tell whether the 150ms p99 budget is being met or silently violated.",
+      "recommendation": "Add a Timer/duration histogram around LinkResource.resolve() (and ideally create()) the same way ClickEventConsumer already does around onClickEvent, and alert on p99 against the documented 150ms budget.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f30",
+      "check_id": "observability.a",
+      "claim": "LinkExpiryJob emits only a single post-hoc gauge (links_expired_last_run) — no counter for how many times the job actually ran and no failure counter, so a silently-stopped scheduler and a run that legitimately found zero expired links are not distinguishable from the metrics alone",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "no explicit doc claim — evaluated directly against code",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "low",
+      "packages": ["com.example.linkshortener.scheduler"],
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/scheduler/LinkExpiryJob.java", "line": 27, "note": "expireOldLinks() body — only registry.gauge(\"links_expired_last_run\", expired) at line 29, no run counter, no duration timer, no try/catch around the repository call"}
+      ],
+      "explanation": "A gauge that reads 0 is indistinguishable from 'the job didn't run at all' vs. 'the job ran and there was nothing to expire' — the golden-signal pattern this rubric explicitly warns about (a component that looks instrumented but is missing the one signal that actually matters).",
+      "recommendation": "Add a run counter and a duration timer around expireOldLinks(), and increment a failure counter when the repository call throws, so 'job stopped running' is distinguishable from 'nothing to expire' in the metrics.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f31",
+      "check_id": "observability.a",
+      "claim": "ClickEventConsumer has traffic, error, and latency signals but no saturation signal — nothing measures consumer lag or backlog against the stated 200 msg/s sustained target, so the system can fall behind its own throughput target with no metric to detect it from within this repo",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Target load bullet (line 5, '200 messages/second sustained on click-events')",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "low",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 5, "note": "200 msg/s sustained target"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 33, "note": "onClickEvent has a processed counter (line 39), a failed counter (line 41), and a duration timer (lines 35, 44) — 3 of 4 golden signals; no consumer-lag/backlog/saturation metric anywhere in this class or application.properties"}
+      ],
+      "explanation": "This consumer nails 3 of 4 golden signals, which is exactly the pattern the rubric warns is easy to miss the last one on — no signal exists for 'this consumer is falling behind its 200 msg/s target,' distinct from a per-message failure counter.",
+      "recommendation": "Add a consumer-lag/backlog metric for the click-events topic (e.g. via Micrometer's Kafka consumer metrics binder) so backlog growth relative to the 200 msg/s target is visible before it becomes a delivery or DLQ problem.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grepped ClickEventConsumer.java and application.properties for 'lag'/'backlog'/'saturation' — none found in this repository"],
+      "limitations": ["Consumer-lag monitoring is commonly provided by Kafka broker/cluster tooling external to the consuming application's own repo — this finding is scoped to what's observable from within this repository only."]
+    },
+    {
+      "id": "f32",
+      "check_id": "maintainability.a",
+      "claim": "Every file in this service's git history has exactly one author (Sumeet Sharma) — a single-author bus-factor concentration across the entire codebase, though the signal is low-confidence at this fixture's scale (one commit total)",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "no explicit doc claim — evaluated directly against code",
+      "classification": "risk",
+      "dimension": "maintainability",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"note": "git log --follow --format='%an|%ad' across src/main/java/com/example/linkshortener shows exactly one author across the entire history; compute_churn.py's own analysis/churn.json for this fixture reports empty bus_factor_hotspots/high_diversity_hotspots (too little history for the churn script's own thresholds to produce a signal)"}
+      ],
+      "explanation": "The raw signal (single author) is real and directly observed, but at this fixture's scale (one commit, added as a complete fixture rather than grown organically) it doesn't mean what single-author concentration means in a real, long-lived production repo.",
+      "recommendation": "No immediate action needed given the signal is low-confidence at this scale; worth re-checking once the codebase has organic multi-author, multi-commit history.",
+      "confidence": "low",
+      "evidence_type": ["git-history"],
+      "searches_performed": [
+        "git log --follow --format='%an|%ad' --date=short -- examples/clean-service/src/main/java/com/example/linkshortener | sort | uniq -c — 1 author, 1 commit",
+        "reviewed analysis/churn.json — bus_factor_hotspots and high_diversity_hotspots both empty"
+      ],
+      "limitations": ["This is a small example fixture created in a single commit, not an organically-grown production repo — single-author/single-commit history here reflects fixture construction, not necessarily a bus-factor problem a live service would actually have."]
+    },
+    {
+      "id": "f33",
+      "check_id": "reliability-resilience.a",
+      "claim": "All three write/mutation paths in this service carry idempotency treatment proportional to their actual stakes: link creation is strictly idempotent (client-supplied Idempotency-Key backed by a unique DB index, checked before any write), the expiry job is idempotent via a conditional WHERE clause, and click-counting deliberately accepts redelivery-driven double-counting as a documented, scope-limited trade-off for a non-billing analytics signal",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Design Philosophy (lines 26-30)",
+      "classification": "strength",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.service", "com.example.linkshortener.scheduler", "com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/service/LinkService.java", "line": 21, "note": "createLink checks findByIdempotencyKey before writing"},
+        {"file": "sql/001-links.sql", "line": 19, "note": "CREATE UNIQUE INDEX IdxIdempotencyKey"},
+        {"file": "src/main/java/com/example/linkshortener/scheduler/LinkExpiryJob.java", "line": 11, "note": "javadoc: idempotent via WHERE status != 'expired'"},
+        {"file": "docs/technical-vision.md", "line": 26, "note": "design philosophy: availability over exactness for clicks, exactness for creation"}
+      ],
+      "explanation": "This is good engineering judgment, not accidental consistency: the two paths where duplication would matter (money-adjacent correctness: link identity, and safe replay: the expiry sweep) are strictly idempotent, while the one path where duplication is genuinely low-stakes (an analytics counter) explicitly and knowingly tolerates it.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "schema", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f34",
+      "check_id": "reliability-resilience.b",
+      "claim": "The one external dependency this service calls (the analytics backend, via AnalyticsClient) has real failure isolation — a 500ms timeout, a circuit breaker, and a fallback — rather than a bare, unguarded HTTP call",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "External calls table (line 31)",
+      "classification": "strength",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.client", "com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 17},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 18},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 19},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 37, "note": "click-count write (line 37) happens before the guarded analytics call (line 38), so a circuit-open/timeout/fallback on analytics can never roll back or block the already-durable click count"}
+      ],
+      "explanation": "Verified actual client configuration (annotation parameters), not just that a fault-tolerance-capable library is present, and confirmed the call-ordering that makes the guard actually effective.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": ["Database-layer failure isolation (connection/read timeouts, DB-level circuit breaking) could not be assessed — LinkRepository is an explicitly unwired stub in this fixture with no datasource configuration present in application.properties, so there is nothing in this repo to evaluate on that path."]
+    },
+    {
+      "id": "f35",
+      "check_id": "reliability-resilience.c",
+      "claim": "The click-events consumer is configured with failure-strategy=dead-letter-queue, not ignore or infinite-retry — a message that can never be processed lands in click-events-dlq, inspectable, rather than vanishing",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "Message Consumers table (line 19)",
+      "classification": "strength",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"file": "src/main/resources/application.properties", "line": 7},
+        {"file": "src/main/resources/application.properties", "line": 8}
+      ],
+      "explanation": "Verified the actual failure-strategy config value, not just that a DLQ concept is mentioned somewhere.",
+      "confidence": "high",
+      "evidence_type": ["configuration"],
+      "limitations": []
+    },
+    {
+      "id": "f36",
+      "check_id": "reliability-resilience.d",
+      "claim": "ClickEventConsumer's onClickEvent performs two side-effecting steps (a DB write via recordClick, then a best-effort external call via forwardClickEvent) without an outbox/compensating-action pattern, and this is safe rather than an inconsistency window because the second step is explicitly non-authoritative and ordered after the first: recordClick (the durable, source-of-truth write) always runs before forwardClickEvent (the droppable side effect), so a failure in step 2 never leaves step 1 needing to be undone",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Design Philosophy, Analytics forwarding paragraph (lines 32-34)",
+      "classification": "strength",
+      "dimension": "reliability-resilience",
+      "severity": "low",
+      "packages": ["com.example.linkshortener.consumer", "com.example.linkshortener.client"],
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 37, "note": "linkService.recordClick(shortCode) — durable write, runs first"},
+        {"file": "src/main/java/com/example/linkshortener/consumer/ClickEventConsumer.java", "line": 38, "note": "analyticsClient.forwardClickEvent(shortCode) — best-effort, runs second, guarded by @Fallback"},
+        {"file": "src/main/java/com/example/linkshortener/client/AnalyticsClient.java", "line": 24, "note": "recordSkipped fallback javadoc explicitly states the click was already durably recorded before this call"}
+      ],
+      "explanation": "docs/architecture.md's own claim (see finding f6) is specifically about DB-write-plus-message-publish pairings and is narrowly true — but a DB-write-plus-external-call pairing does exist here, just not a message publish. This finding evaluates that actual 2-step operation on its own merits (independent of whether it matches the doc's narrower wording) and finds it correctly designed: ordering plus non-authoritative status makes an outbox pattern unnecessary here, rather than the absence of one being an oversight.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f37",
+      "check_id": "reliability-resilience.e",
+      "claim": "No code in this repository consumes or reprocesses messages from click-events-dlq, and no recovery point/time objective is stated anywhere for a DLQ'd click event — a message that lands in the DLQ has no defined path back to being processed, or even counted, from within this repo",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "no explicit doc claim — evaluated directly against code",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "low",
+      "packages": ["com.example.linkshortener.consumer"],
+      "evidence": [
+        {"note": "repo-wide search for any consumer of the click-events-dlq topic, or any reprocessing/reconciliation job referencing it, found none"}
+      ],
+      "explanation": "A DLQ configured with no reprocessing path or completeness metric is a common, real gap — messages can pile up in the DLQ topic indefinitely with nobody notified. Given click-events processing has no stated SLA and already tolerates duplicate/lossy counting by design (per technical-vision.md's own Design Philosophy), the actual impact of an unreprocessed DLQ backlog is low, not high.",
+      "recommendation": "Decide and document an explicit recovery expectation for click-events-dlq (e.g. a scheduled reprocessing job, or an explicit 'manually inspected, not auto-replayed' policy) so a growing DLQ backlog doesn't go unnoticed indefinitely.",
+      "confidence": "medium",
+      "evidence_type": ["negative-search"],
+      "searches_performed": [
+        "grep -rn '@Incoming' src/ — only click-events, no consumer for click-events-dlq",
+        "grepped the repo for 'dlq' outside of application.properties/boundaries.md — no reprocessing/reconciliation code found"
+      ],
+      "limitations": ["Runtime/ops-level DLQ reprocessing (a manual runbook, an external tool) is not stored in this repository and can't be ruled out from source alone."]
+    },
+    {
+      "id": "f38",
+      "check_id": "change-safety.a",
+      "claim": "REST endpoints are versioned from the start (/api/v1/) with a documented policy for when a breaking v2 would be introduced versus when additive fields ship without a version bump, and message channels are never repurposed once they have a consumer — a semantic change ships as a new channel name with the old one drained and removed",
+      "doc_source": "docs/technical-vision.md",
+      "doc_location": "Versioning & Deprecation Policy (lines 16-21)",
+      "classification": "strength",
+      "dimension": "change-safety",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.resource"],
+      "evidence": [
+        {"file": "docs/technical-vision.md", "line": 16},
+        {"file": "src/main/java/com/example/linkshortener/resource/LinkResource.java", "line": 20, "note": "@Path(\"/api/v1/links\")"}
+      ],
+      "explanation": "A stated versioning/deprecation policy for both HTTP and messaging surfaces is uncommon even in real production services this skill has audited before; the code backs the API-versioning half of it directly.",
+      "confidence": "high",
+      "evidence_type": ["documentation", "direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f39",
+      "check_id": "change-safety.b",
+      "claim": "The one real schema migration in this repo (002-add-tag-column.sql) is a genuine expand step — a nullable column added and explicitly not yet enforced non-null — rather than a live breaking change",
+      "doc_source": "docs/data-model.md",
+      "doc_location": "Link section, tag field description (lines 11-12)",
+      "classification": "strength",
+      "dimension": "change-safety",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "sql/002-add-tag-column.sql", "line": 5, "note": "ALTER TABLE Link ADD COLUMN tag VARCHAR(64) NULL"},
+        {"file": "sql/002-add-tag-column.sql", "line": 1, "note": "migration comment: nullable, backfilled out-of-band, NOT NULL constraint deferred as a deliberate later step"}
+      ],
+      "explanation": "This is a young repo with only one post-initial migration, so it can't yet demonstrate a full expand-then-contract cycle in the act — but the one migration that exists is unambiguously the correct first half of that pattern, not a live breaking change.",
+      "confidence": "high",
+      "evidence_type": ["schema", "git-history"],
+      "limitations": ["Only one migration beyond the initial create exists in this repo, so this confirms the expand step was done correctly, not that the eventual contract/enforce step has actually been carried out end-to-end yet."]
+    },
+    {
+      "id": "f40",
+      "check_id": "change-safety.d",
+      "claim": "The tag column addition is rollback-safe: it's nullable and no application code depends on it being non-null yet, so a code-only rollback (reverting to code without the tag field) still works against the widened schema without needing the schema change reverted in lockstep",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "no explicit doc claim — evaluated directly against code",
+      "classification": "strength",
+      "dimension": "change-safety",
+      "severity": "low",
+      "packages": ["com.example.linkshortener.entity"],
+      "evidence": [
+        {"file": "sql/002-add-tag-column.sql", "line": 1, "note": "comment: 'No application code depends on tag being non-null yet'"},
+        {"file": "src/main/java/com/example/linkshortener/entity/Link.java", "line": 28, "note": "tag field mapped but not referenced by any service/resource logic"}
+      ],
+      "explanation": "The additive-and-unused property of this specific migration is what makes it a one-way-safe expand step rather than a rollback risk — verified by grepping for any actual code dependency on the new field, not just trusting the migration comment's own claim.",
+      "confidence": "medium",
+      "evidence_type": ["schema", "direct-code", "negative-search"],
+      "searches_performed": ["grep -rn 'tag' src/ — only Link.java's field declaration references it; no service/resource logic reads or writes it"],
+      "limitations": []
+    },
+    {
+      "id": "f41",
+      "check_id": "change-safety.e",
+      "claim": "No feature-flag, canary, or percentage-rollout mechanism exists anywhere in this repository — every deploy of a behavior change ships all-or-nothing to all instances at once",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "no explicit doc claim — evaluated directly against code",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"note": "searched build.gradle's dependency list and every .java/.properties file in the repo for a feature-flag/toggle/canary/rollout library or pattern — none found"}
+      ],
+      "explanation": "This system's actual change-safety story leans entirely on versioned APIs and expand/contract migrations rather than gradual rollout — a coherent strategy for additive/schema changes, but it leaves no gradual-exposure mechanism for a genuinely risky behavioral change (e.g. altering the click-counting consistency trade-off itself).",
+      "recommendation": "If a genuinely risky behavioral change is ever needed, consider a config-gated rollout rather than relying solely on versioned APIs and additive migrations, which cover schema/API risk but not behavioral-logic risk.",
+      "confidence": "high",
+      "evidence_type": ["negative-search"],
+      "searches_performed": ["grep -rniE 'featureflag|feature_flag|canary|toggle|rollout|launchdarkly|unleash' . — no matches anywhere in the repo", "reviewed build.gradle's dependency list — no feature-flag SDK present"],
+      "limitations": ["This assesses only what's expressed in-repo; a deployment platform outside this repository could still provide canary/percentage-rollout capability at the infrastructure level that wouldn't show up in application code."]
+    },
+    {
+      "id": "f42",
+      "check_id": "security-boundaries.a",
+      "claim": "Every externally-reachable HTTP entry point in this service (both LinkResource endpoints — the only resource class in the repo) is covered by the same global, unscoped AuthenticationFilter — there is no endpoint that ships unprotected or with a weaker/different auth mechanism than its sibling",
+      "doc_source": "docs/boundaries.md",
+      "doc_location": "HTTP API section (lines 5-13)",
+      "classification": "strength",
+      "dimension": "security-boundaries",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.resource", "com.example.linkshortener.security"],
+      "evidence": [
+        {"file": "src/main/java/com/example/linkshortener/security/AuthenticationFilter.java", "line": 16, "note": "@Provider, no @NameBinding — applies to every JAX-RS resource by default per spec"},
+        {"note": "repo-wide search confirms LinkResource is the only @Path-annotated class — 2 endpoints total, both covered"}
+      ],
+      "explanation": "Enumerated the actual entry points (2, both in LinkResource) rather than sampling, and confirmed the filter's scope is global by construction (no @NameBinding), not merely intended to be.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": ["grep -rl '@Path' src/ — only LinkResource.java"],
+      "limitations": []
+    },
+    {
+      "id": "f43",
+      "check_id": "security-boundaries.b",
+      "claim": "The auth credential is sourced from the AUTH_CREDENTIAL environment variable with no fallback/default value in application.properties — unlike the operational tuning knobs (consumer concurrency, job interval) which do have literal defaults, the secret is required to be explicitly configured rather than silently guessable",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "no explicit doc claim — evaluated directly against code",
+      "classification": "strength",
+      "dimension": "security-boundaries",
+      "severity": "medium",
+      "packages": ["com.example.linkshortener.security"],
+      "evidence": [
+        {"file": "src/main/resources/application.properties", "line": 2, "note": "linkshortener.auth-credential=${AUTH_CREDENTIAL} — no ':default' fallback, unlike lines 6 and 10 which do have literal defaults"}
+      ],
+      "explanation": "Noticed and verified a detail the doc doesn't call out itself: the secret property has no ${VAR:default} fallback, while every other env-backed property in the same file does — a small but real difference that prevents the service from ever silently booting with a guessable/empty credential.",
+      "confidence": "high",
+      "evidence_type": ["configuration", "negative-search"],
+      "searches_performed": ["grepped src/ for hardcoded password/secret/apikey/token literals — none found"],
+      "limitations": []
+    }
+  ]
+}
