@@ -4,6 +4,9 @@
     {
       "id": "sample-service-docs-bad-must-find",
       "description": "Every deliberately planted issue in examples/sample-service (docs-bad scenario) must survive as a finding. Source of truth for this list: examples/sample-service/README.md's planted-issues table.",
+      "fixture_repo": "examples/sample-service",
+      "docs_path": "docs-bad",
+      "mode": "full",
       "must_find": [
         {"match": "bulk", "classification": "gap", "note": "undocumented bulk-import REST endpoint"},
         {"match": "task-reminders", "classification": "gap", "note": "undocumented TaskReminderConsumer"},
@@ -22,6 +25,9 @@
     {
       "id": "minimal-cli-tool-must-not-find",
       "description": "system-context classification (cli-tool) must suppress false-positive risk findings for a system type that legitimately has no throughput/observability surface. This is the golden case for the check-coverage model's not-applicable path — see examples/minimal-cli-tool.expected.md.",
+      "fixture_repo": "examples/minimal-cli-tool",
+      "docs_path": "docs",
+      "mode": "evaluate",
       "must_not_find": [
         {"match": "throughput|QPS|scale target", "classification": "risk", "dimension": "scale-requirements", "note": "missing scale target must NOT be a risk for a cli-tool"},
         {"match": "golden signal|metric|observability", "classification": "risk", "dimension": "observability", "note": "missing observability must NOT be a risk for a cli-tool"}

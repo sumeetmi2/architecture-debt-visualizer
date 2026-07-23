@@ -238,6 +238,19 @@ gaps, since fixed directly in `references/evaluation-rubric.md`:
 
 **Eval harness scope:** `evals/run_evals.py` grades already-generated output; it doesn't invoke the
 skill itself, so it validates the grader and catches regressions in already-produced findings, but
-won't catch a regression in triggering, reference-loading, or the investigation itself. An
-end-to-end runner that actually invokes Claude Code against a fixture and grades the result is a
-known gap, not yet built.
+on its own won't catch a regression in triggering, reference-loading, or the investigation itself.
+`evals/run_e2e_eval.py` closes that gap — it shells out to `claude -p` (headless, `--plugin-dir`
+pointed at this checkout so `${CLAUDE_PLUGIN_ROOT}` resolves to it, not any globally-installed
+version) against a fixture repo's real directory, runs `validate_findings.py` against whatever the
+agent produced, confirms the fixture repo itself was left untouched (`git status --porcelain`), and
+grades the result with the same `grade_case()` `run_evals.py` uses (refactored out of `main()` so
+both paths share one grading implementation instead of forking the logic). `cases.json` entries
+gained `fixture_repo`/`docs_path`/`mode` fields so a case knows what to actually run, not just what
+to grade.
+
+Real proof run: `minimal-cli-tool-must-not-find` end to end — `claude -p` invocation succeeded
+(cost $1.46, 373s, 31 turns), `validate_findings.py` passed (5 findings, 37 checks, 1 non-blocking
+warning), fixture confirmed untouched, and the case graded PASS (both `must_not_find` clean, all 4
+`expected_not_applicable` checks correctly resolved `not-applicable`). Costs real API spend and
+takes several minutes per case — intentionally a manual/on-demand harness, not wired into
+CI-on-every-commit.
