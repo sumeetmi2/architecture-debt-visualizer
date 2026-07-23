@@ -32,6 +32,8 @@ applied. See `system-classification.md` for why this is kept as two separate que
 ## `checks.json` (evaluate/full modes only)
 
 One entry per mandatory (and optionally, non-mandatory) check from `scripts/rubric_manifest.json`.
+An id needs at least one entry to count as covered; it can have more than one (see **scoped check
+instances** below).
 
 ```json
 {
@@ -70,6 +72,45 @@ One entry per mandatory (and optionally, non-mandatory) check from `scripts/rubr
   ]
 }
 ```
+
+### Scoped check instances
+
+**A check id may appear more than once in `checks.json` when it genuinely covers multiple
+distinct-outcome targets — one instance per target, each with its own `scope`, `status`, and
+evidence/`finding_ids`/`reason`.** This exists for compound checks like `observability.a` ("check
+all four golden signals separately for the 2-3 most critical paths") where different targets
+legitimately land on different outcomes — one path fully instrumented (`clean`), another missing
+metrics entirely (`risk`). Forcing that into one record with one status either hides the clean
+path's coverage or waters down the risk finding.
+
+```json
+{
+  "id": "observability.a",
+  "dimension": "observability",
+  "status": "clean",
+  "scope": ["OrderService"],
+  "evidence": [{"file": "src/main/java/.../OrderMetrics.java", "line": 12, "note": "traffic/error/latency/saturation all emitted"}]
+},
+{
+  "id": "observability.a",
+  "dimension": "observability",
+  "status": "risk",
+  "scope": ["OrderEventConsumer"],
+  "confidence": "high",
+  "finding_ids": ["f17"]
+}
+```
+
+Rules:
+- **Each instance's `scope` must be disjoint from every other instance of the same id.** Two
+  instances of the same id with overlapping `scope` entries is a validation error — it means the
+  same target got assessed twice, not two different targets.
+- **Only split when the outcome genuinely differs per target.** If every target you'd examine for a
+  check lands on the same status, use one instance with all of them in `scope` — the multi-instance
+  form exists to preserve real per-target distinctions, not as a mandatory enumeration format.
+- Mandatory-coverage counts an id as covered if *any* one of its instances has a non-`not-assessed`
+  status — you don't need every instance covered to satisfy the manifest, since the manifest tracks
+  ids, not the number of targets a given repo happens to have.
 
 - `id` — must match an id in `scripts/rubric_manifest.json`.
 - `status` — `risk` / `strength` / `clean` / `not-applicable` / `not-assessed`.

@@ -133,9 +133,14 @@ performed and problems found, and it created a real incentive to manufacture a w
 to hit a floor.
 
 The actual rule: **every check listed in `scripts/rubric_manifest.json` that is `mandatory` for
-this repo's classified `system_type` (see `system-classification.md`) must produce exactly one
+this repo's classified `system_type` (see `system-classification.md`) must produce at least one
 coverage record** in `checks.json`, with a status of `risk`, `strength`, `clean`,
-`not-applicable`, or `not-assessed`:
+`not-applicable`, or `not-assessed`. Usually that's exactly one record. When a compound check (see
+`observability.a` below) covers several distinct targets that genuinely land on different outcomes,
+write one **scoped check instance** per target instead of forcing one aggregate status over all of
+them — see `report-schema.md`'s "Scoped check instances" section for the exact form and the
+disjoint-scope rule. Don't over-split a check whose targets all land on the same outcome; the
+multi-instance form exists to preserve real per-target differences, not as a mandatory enumeration:
 
 - `risk` / `strength` — becomes a full entry in `findings.json` too (see `report-schema.md`),
   linked back to the check id.
@@ -280,7 +285,9 @@ is the same finding pattern, just undocumented.
 (a) pick the 2-3 most critical logic paths (highest business impact and/or highest churn — use the
 churn/dep-graph output, don't guess) and check all four golden signals for each, *separately* —
 explicitly note which of traffic/errors/latency/saturation you found evidence for and which you
-didn't, per path;
+didn't, per path. If the paths land on different outcomes (one fully instrumented, another
+missing metrics entirely), write one scoped check instance per path rather than one aggregate
+status for all of them (see `report-schema.md`'s "Scoped check instances");
 (b) trace whatever code path is responsible for recovering from/reporting on a known failure mode
 (a reconciliation job, a retry sweep, a dead-letter consumer, an "expected vs. actual" completeness
 check) all the way to its output, and check whether that output is a metric or just a log line.

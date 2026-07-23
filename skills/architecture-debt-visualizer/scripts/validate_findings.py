@@ -146,7 +146,7 @@ def main():
     # checks.json validation
     if checks_doc is not None:
         checks = checks_doc.get("checks", [])
-        seen_check_ids = set()
+        seen_instances = {}  # id -> list of (scope_frozenset, check_dict)
         finding_id_owners = {}
         manifest_ids = set()
         if manifest:
@@ -159,10 +159,22 @@ def main():
             where = f"check {cid or '(no id)'}"
             if not cid:
                 errors.append(f"{where}: missing required 'id'")
-            elif cid in seen_check_ids:
-                errors.append(f"{where}: duplicate check id")
             else:
-                seen_check_ids.add(cid)
+                scope = frozenset(c.get("scope") or [])
+                instances = seen_instances.setdefault(cid, [])
+                for other_scope, _ in instances:
+                    if scope == other_scope:
+                        errors.append(f"{where}: duplicate check instance (same id and scope)")
+                        break
+                    if scope & other_scope:
+                        errors.append(
+                            f"{where}: scope overlaps with another instance of the same id "
+                            f"(shared: {sorted(scope & other_scope)}) — each scoped instance must "
+                            f"cover a disjoint target, see report-schema.md's 'Scoped check instances'"
+                        )
+                        break
+                else:
+                    instances.append((scope, c))
             if manifest_ids and cid and cid not in manifest_ids:
                 errors.append(f"{where}: id not found in scripts/rubric_manifest.json")
 

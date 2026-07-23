@@ -184,10 +184,34 @@ the first generated after the schema change. Neither set was regenerated to matc
 schema change shouldn't quietly rewrite history.
 
 **Compound checks:** some lettered checks (e.g. `observability.a`, which asks for all four golden
-signals across 2-3 critical paths in one pass) bundle several distinct facts into one check id —
-real, not yet resolved. A second external review's suggested fix is scoped/parameterized check
-instances (one check id, multiple scope-tagged sub-results) rather than one flat check per lettered
-item — a real schema change, not yet built.
+signals across 2-3 critical paths in one pass) bundle several distinct facts into one check id. A
+second external review's suggested fix — scoped/parameterized check instances (one check id,
+multiple scope-tagged sub-results) rather than one flat check per lettered item — is now built:
+`checks.json` accepts multiple instances of the same id, each tagged with a disjoint `scope` and
+its own status (`references/report-schema.md`'s "Scoped check instances"); `validate_findings.py`
+flags overlapping scope between instances of the same id as an error; `generate_report.py`'s
+audit-coverage and check-coverage computations were fixed to consider every instance of an id
+(they previously only saw the last one in file order, which both under- and over-counted coverage
+depending on instance order — never exercised in practice before this, since no run had emitted
+more than one instance per id). Verified with a synthetic fixture exercising a clean+risk
+scoped-instance pair alongside a same-scope duplicate (correctly rejected), plus a regression run
+against the existing `clean-service` fixture showing byte-identical coverage output to before the
+change.
+
+One cold run (fresh agent, no memory), `evaluate` mode against `examples/clean-service`:
+`validate_findings.py` passed clean (26 findings, 41 checks). The agent used scoped instances on
+its own, unprompted beyond the rubric text, for 3 ids (7 instances total against 37 base checks):
+`observability.a` split across three critical paths that genuinely landed on different golden-signal
+counts (1/4, 1/4, 3/4 signals present), `scalability.a` split across one env-overridable config
+(strength) vs. one hardcoded fault-tolerance threshold (risk), `reliability-resilience.b` split
+across an implemented client (strength) vs. an unimplemented stub with nothing to assess
+(not-assessed). It correctly did *not* split the two consistency-style checks
+(`extensibility.b`/`maintainability.b`) despite the temptation, since this repo only has one
+instance of each compared thing — marked `not-applicable` instead, per the existing rule. No
+friction reported reading either the `report-schema.md` or `evaluation-rubric.md` guidance. 4 of
+its 6 substantive risk findings matched the original `run1` cold run almost exactly (resolve-
+latency gap, DLQ-reprocessing gap, no feature-flag mechanism), with two defensible severity/
+judgment divergences given the same thin evidence — not a rubric problem.
 
 **Reliability/resilience, change-safety, and security-boundaries dimensions** were added after the
 same review (12 dimensions total now, up from 9) with 5 lettered checks each, following the exact

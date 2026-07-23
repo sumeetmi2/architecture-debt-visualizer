@@ -214,8 +214,15 @@ def compute_audit_coverage(checks_doc, context_doc, manifest):
             mandatory_ids.add(chk["id"])
     if not mandatory_ids:
         return None
-    by_id = {c.get("id"): c for c in checks_doc.get("checks", [])}
-    completed = sum(1 for cid in mandatory_ids if by_id.get(cid, {}).get("status") not in (None, "not-assessed"))
+    # A check id may have multiple scoped instances (see report-schema.md's "Scoped check
+    # instances") — an id is covered if ANY of its instances has a real status, not just its last.
+    statuses_by_id = {}
+    for c in checks_doc.get("checks", []):
+        statuses_by_id.setdefault(c.get("id"), []).append(c.get("status"))
+    completed = sum(
+        1 for cid in mandatory_ids
+        if any(st not in (None, "not-assessed") for st in statuses_by_id.get(cid, []))
+    )
     return round(100 * completed / len(mandatory_ids)), completed, len(mandatory_ids)
 
 
@@ -303,7 +310,11 @@ def build_indicators(findings, checks_doc, context_doc, manifest):
 def build_check_coverage(checks_doc, context_doc, manifest):
     if not checks_doc or not manifest:
         return None
-    by_id = {c.get("id"): c for c in checks_doc.get("checks", [])}
+    # A check id may have multiple scoped instances (see report-schema.md's "Scoped check
+    # instances") — group them so the status breakdown reflects every instance, not just one.
+    instances_by_id = {}
+    for c in checks_doc.get("checks", []):
+        instances_by_id.setdefault(c.get("id"), []).append(c)
     system_type = s(context_doc or {}, "system_type", "production-service")
     overrides = manifest.get("system_type_overrides", {}).get(system_type, {})
 
@@ -312,13 +323,19 @@ def build_check_coverage(checks_doc, context_doc, manifest):
     for dim, dim_def in manifest.get("dimensions", {}).items():
         applicability = overrides.get(dim, "mandatory")
         for chk in dim_def.get("checks", []):
-            rec = by_id.get(chk["id"])
-            status = rec.get("status") if rec else "not-assessed"
-            status_counts[status] = status_counts.get(status, 0) + 1
+            recs = instances_by_id.get(chk["id"])
+            statuses = [r.get("status") for r in recs] if recs else ["not-assessed"]
+            for status in statuses:
+                status_counts[status] = status_counts.get(status, 0) + 1
             if applicability == "mandatory":
                 mandatory_total += 1
 
     summary = " · ".join(f"{v} {k}" for k, v in status_counts.items() if v)
+    total_instances = sum(status_counts.values())
+    checks_label = (
+        f"{mandatory_total} mandatory checks ({total_instances} scoped instances)"
+        if total_instances != mandatory_total else f"{mandatory_total} mandatory checks"
+    )
     informational = [k for k, v in overrides.items() if v != "mandatory"]
     context_note = (
         f"System type: <b>{html.escape(system_type)}</b>"
@@ -327,7 +344,7 @@ def build_check_coverage(checks_doc, context_doc, manifest):
 
     return f"""
         <div class="insight-block">
-          <div class="insight-stats">{mandatory_total} mandatory checks · {html.escape(summary)}</div>
+          <div class="insight-stats">{checks_label} · {html.escape(summary)}</div>
           <div class="insight-stats">{context_note}</div>
         </div>
     """
