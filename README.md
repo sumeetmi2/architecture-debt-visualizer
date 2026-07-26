@@ -1,12 +1,16 @@
 # architecture-debt-visualizer
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Plugin version](https://img.shields.io/badge/plugin-2.0.0-blue.svg)](.claude-plugin/plugin.json)
+
 An open-source Claude Code skill and plugin for architecture reviews, documentation-drift
 detection, and evidence-based technical-debt analysis.
 
 It compares your architecture docs against the real codebase, flags stale or incorrect design
-claims, and independently evaluates the architecture across 12 dimensions — scalability,
-extensibility, reliability/resilience, security boundaries, change safety, data architecture,
-observability, maintainability, performance/cost, and vision-alignment.
+claims, and independently evaluates the architecture across 12 dimensions — scale requirements,
+extensibility requirements, scalability, extensibility, maintainability, performance/cost, data
+architecture, observability, reliability/resilience, change safety, security boundaries, and
+vision alignment.
 
 Use it to answer questions like:
 - Do our architecture docs still match the code?
@@ -176,9 +180,14 @@ must-find/must-not-find specs graded against real run output.
 
 See [`docs/validation.md`](docs/validation.md) for the full methodology, terminology, raw linked
 reports, the rubric's evolution (open-ended target → min/max finding count → check-coverage model),
-and known limitations — including one honest one: the eval harness grades already-generated output
-rather than invoking the skill end to end, and the 9-dimension rubric doesn't yet have dedicated
-checks for reliability/resilience, change-safety, or security/trust-boundary concerns.
+and known limitations disclosed rather than hidden — including a phrasing-rule recurrence that
+`validate_findings.py` flags but can't fully self-enforce, since detecting it reliably needs
+semantic judgment a keyword heuristic can't fully make.
+
+## Contributing
+
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for where things live and how
+rubric changes get validated (cold-agent testing, not reasoning about prose).
 
 ## License
 
