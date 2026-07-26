@@ -162,6 +162,12 @@ each other) on:
 - the same fixture accurately documented (`docs-good` scenario),
 - a CLI-tool fixture built specifically to test false-positive suppression
   ([`examples/minimal-cli-tool`](examples/minimal-cli-tool)),
+- a deliberately well-built fixture to test over-flagging
+  ([`examples/clean-service`](examples/clean-service)),
+- a library fixture testing `library`-specific check suppression
+  ([`examples/template-lib`](examples/template-lib)),
+- a fixture testing infra/config managed outside the repo
+  ([`examples/externally-deployed-config`](examples/externally-deployed-config)),
 - and a private production monorepo (name/domain withheld).
 
 A `validate_findings.py` script hard-enforces the evidence/schema rules rather than leaving them to

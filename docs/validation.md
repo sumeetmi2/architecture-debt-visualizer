@@ -211,6 +211,52 @@ One real mismatch, one real process gap, both fixed the same session:
   `not-applicable` for a library with no deploy/migration/rollout surface — not a rubric bug, a
   fixture-doc bug.
 
+## Externally-managed-infra test: `examples/externally-deployed-config`
+
+Every fixture above assumes the audited repo is the complete picture of its own operational
+posture. [`examples/externally-deployed-config`](../examples/externally-deployed-config) tests the
+common real-world case where it deliberately isn't: `webhook-relay` (Kafka consumer, scheduled
+retry job, one REST endpoint, real schema) has zero deployment manifests, no Dockerfile, no
+autoscaling/alerting config anywhere in the repo — `docs/architecture.md`'s "What's managed
+elsewhere" section explains that those live in a separate `platform-infra` repo by design, and a
+separate `subscription-registry` service owns subscriber identity over the network. The point:
+`references/evidence-standard.md`'s narrow-claim discipline — *"no scaling config in this
+repository"* rather than the false, unverifiable *"no scaling path exists"* — needs to hold even
+when the doc's explanation for the absence is specific and genuinely plausible, and a hardcoded,
+in-repo capacity literal (`domain-events-pool.max-concurrency=4`) shouldn't get excused by
+proximity to that framing. See
+[`examples/externally-deployed-config.expected.md`](../examples/externally-deployed-config.expected.md)
+for the full pass bar and the actual first-run result.
+
+One cold run (fresh agent, no memory), `full` mode: `system_type` classified `production-service`,
+confidence **high** — correctly reasoned through both the `build.gradle` "illustrative only, not
+buildable" disclaimer and the total absence of deployment manifests via
+`system-classification.md`'s explicit rules for each, rather than misreading either as
+prototype/unknown signal. `validate_findings.py`, independently re-run against the raw output
+(not taken from the agent's self-report): `OK (47 findings, 38 checks, 0 warnings)`. **47
+findings** (16 confirmed, 1 misaligned, 3 gap, 22 risk — 7 high/6 medium/9 low, 5 strength), audit
+coverage **38/38 (100%)**. Report indicators: **Documentation fidelity 80%, Architecture risk
+High, Audit coverage 100%, Evidence confidence 79%** — docs mostly accurate, architecture still
+genuinely high-risk, the two numbers correctly moving independently instead of one masking the
+other.
+
+The externally-managed absences (`scale-requirements.a`/`.b`) both came back `confidence: high`
+with an explicit limitation distinguishing "absent from this repo, disclosed as living in
+platform-infra" from "doesn't exist anywhere" — no rubric-wording fix needed, the existing
+narrow-claim example generalized correctly. `domain-events-pool.max-concurrency=4` was kept a
+full-confidence, undiscounted risk rather than getting excused by the surrounding
+externally-managed framing — the specific false-negative failure mode this fixture exists to catch
+didn't happen. The one real defect this run surfaced was in the fixture's own docs, not the rubric:
+`docs/technical-vision.md` confidently claimed "no dual-write anywhere" / `reliability-resilience.d`
+`not-applicable`, on the theory that there's only one *database* write path. The cold run correctly
+rejected that — `DeliveryRetryJob`'s outbound POST (an external side effect) happens before its
+transaction's commit, a real two-step operation with a genuine inconsistency window, independently
+re-derived from the code rather than accepted from the doc's own confident analysis. Fixed in
+`examples/externally-deployed-config.expected.md`, not in the fixture's docs themselves — an
+otherwise-honest doc being wrong about one specific claim is exactly the scenario this fixture
+should be able to catch, so it was left in place as a genuine (if originally unintentional) test of
+that.
+
 ## Known limitations, disclosed rather than hidden
 
 **Phrasing rule recurrence:** a phrasing rule exists (state findings as direct facts, not as an

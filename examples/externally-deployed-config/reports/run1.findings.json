@@ -1,0 +1,917 @@
+{
+  "title": "Architecture Debt Report — webhook-relay (examples/externally-deployed-config)",
+  "doc_sources": [
+    "examples/externally-deployed-config/docs/architecture.md",
+    "examples/externally-deployed-config/docs/technical-vision.md",
+    "examples/externally-deployed-config/docs/boundaries.md",
+    "examples/externally-deployed-config/docs/data-model.md",
+    "examples/externally-deployed-config/README.md"
+  ],
+  "findings": [
+    {
+      "id": "f1",
+      "claim": "DomainEventConsumer resolves subscribers for each event via SubscriptionRegistryClient, an external-service call",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "architecture diagram, lines 8-14",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.consumer", "com.example.webhookrelay.client"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 32, "note": "registryClient.resolveSubscribers(event.type()) called for every consumed event"}
+      ],
+      "explanation": "Code matches: DomainEventConsumer injects SubscriptionRegistryClient and calls resolveSubscribers per event, exactly as the diagram shows.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f2",
+      "claim": "Resolved deliveries are stored in the webhook_delivery table with status=PENDING",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "architecture diagram, line 14",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.consumer", "com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 38, "note": "new WebhookDelivery(..., WebhookDelivery.DeliveryStatus.PENDING, ...) persisted per subscriber"}
+      ],
+      "explanation": "Every delivery row is constructed with status PENDING at ingestion time, matching the diagram.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f3",
+      "claim": "DeliveryRetryJob calls DeliverySender to deliver to the subscriber's target_url",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "architecture diagram, lines 17-19",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.scheduler", "com.example.webhookrelay.service"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 35, "note": "deliverySender.attempt(delivery.getTargetUrl(), delivery.getPayload())"}
+      ],
+      "explanation": "Code matches the diagram's DeliveryRetryJob --> DeliverySender --> subscriber target_url chain exactly.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f4",
+      "claim": "DeliveryResource exposes GET /api/v1/deliveries/{id}, operator read-only",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "architecture diagram, line 20",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.resource"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/resource/DeliveryResource.java", "line": 27, "note": "@GET @Path(\"/{id}\") — only method on this resource, read-only"}
+      ],
+      "explanation": "Single GET method, no mutation endpoints on this resource, matches the doc's 'operator read-only' framing.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f5",
+      "claim": "Subscriber identity and target URLs live entirely in the separate subscription-registry service; this repo never stores or manages the subscription itself, only the resolved target_url on the delivery row",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "\"Two things this repo deliberately does not own\", lines 25-28",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.entity", "com.example.webhookrelay.client"],
+      "evidence": [
+        {"note": "searched for any subscription CRUD endpoint, subscriber entity, or subscription-registry table anywhere in this repo — found only DeliveryResource's single read-only GET and the WebhookDelivery entity, no subscriber-management surface"}
+      ],
+      "explanation": "The only JAX-RS resource in the repo is DeliveryResource's GET; the only entity is WebhookDelivery, which stores subscription_id and target_url as data, not as a managed subscription record. No subscription CRUD exists in-repo, confirming the boundary as stated.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": [
+        "grep for @Path across src/main/java — only one resource class exists",
+        "grep for 'subscription' entity/repository classes beyond the foreign subscription_id column — none found",
+        "reviewed full file listing of src/ — no subscriber-management code anywhere"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f6",
+      "claim": "This repo's own configuration intentionally has no equivalent of a Kubernetes Deployment manifest, HorizontalPodAutoscaler, or alerting-rule file — those live in platform-infra instead",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "\"Runtime infrastructure configuration\" paragraph, lines 30-35",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"note": "full repo file listing under examples/externally-deployed-config/ contains no Kubernetes manifest, Dockerfile, Helm chart, CI/deploy config, or alerting-rule file of any kind"}
+      ],
+      "explanation": "The claim is a negative one (this repo doesn't contain these artifacts) and it holds: a complete recursive file listing shows only source, one SQL migration, docs, build files, and analysis JSON — no deployment/alerting artifacts. This confirms the repo-local half of the claim; the platform-infra half (that they exist and are current there) is outside this repo and cannot be verified from here — that limitation is exactly what the doc itself discloses.",
+      "confidence": "high",
+      "evidence_type": ["negative-search", "documentation"],
+      "searches_performed": [
+        "find . -type f (full recursive listing) across examples/externally-deployed-config — no manifest/Dockerfile/CI file present"
+      ],
+      "limitations": ["Cannot verify from this repo whether platform-infra's webhook-relay/ overlay actually exists or is current — that repo is out of scope."]
+    },
+    {
+      "id": "f7",
+      "claim": "domain-events-pool.max-concurrency=4 is described as \"the one piece of capacity tuning that does live in this repo\" (docs/architecture.md), implying it is the sole hardcoded capacity/timing literal in the codebase",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "lines 45-49",
+      "classification": "gap",
+      "dimension": "correctness",
+      "severity": "low",
+      "packages": ["com.example.webhookrelay.scheduler", "com.example.webhookrelay.client"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 28, "note": "private static final int BATCH_SIZE = 200; — a hardcoded capacity literal, no env override, not mentioned anywhere in the docs"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/client/SubscriptionRegistryClient.java", "line": 20, "note": "@Timeout(value = 500, ...) — a hardcoded literal timeout value, not sourced from config"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/client/SubscriptionRegistryClient.java", "line": 21, "note": "@CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 30, ...) — hardcoded circuit-breaker parameters"}
+      ],
+      "explanation": "The doc's claim is literally true if read narrowly as \"the one tunable in application.properties\" (the other application.properties entries do use ${ENV:default} syntax) — but read as a general statement about hardcoded capacity/timing numbers in this repo, it undersells the picture: BATCH_SIZE, the registry-call timeout, and the circuit-breaker thresholds are equally hardcoded Java literals with no override mechanism, and none of them are mentioned as such anywhere in the docs. This is architecturally significant code the docs never surface under this framing, which is exactly what a Gap captures.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f8",
+      "claim": "GET /api/v1/deliveries/{id} requires the X-Auth-Credential header, checked by AuthenticationFilter",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "HTTP API table, line 9",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.resource", "com.example.webhookrelay.security"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/security/AuthenticationFilter.java", "line": 26, "note": "ctx.getHeaderString(\"X-Auth-Credential\") checked in a global @Provider filter"}
+      ],
+      "explanation": "The filter is a global JAX-RS ContainerRequestFilter (no per-resource opt-in), so it applies to DeliveryResource by construction, matching the doc.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f9",
+      "claim": "The domain-events consumer has no dead-letter topic and no failure-strategy override (defaults apply); concurrency is fixed at 4 with no env override",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "Message Consumers table, line 18",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.consumer"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 28, "note": "@Incoming(\"domain-events\") has no failure-strategy attribute set"},
+        {"file": "examples/externally-deployed-config/src/main/resources/application.properties", "line": 7, "note": "domain-events-pool.max-concurrency=4, a bare literal with no ${ENV} syntax"}
+      ],
+      "explanation": "Both halves of the claim check out: no failure-strategy configuration exists anywhere for this channel, and the concurrency value is a bare literal in application.properties. See f39 for why the 'defaults apply' half of this claim is architecturally significant, not just descriptive.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "configuration", "negative-search"],
+      "searches_performed": [
+        "grep application.properties for any mp.messaging.incoming.domain-events.failure-strategy key — none found"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f10",
+      "claim": "The Scheduled Jobs table describes DeliveryRetryJob's interval and idempotency but has no column for how many rows are processed per run",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "Scheduled Jobs table, lines 20-24",
+      "classification": "gap",
+      "dimension": "correctness",
+      "severity": "low",
+      "packages": ["com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 28, "note": "BATCH_SIZE = 200 caps how many due deliveries are retried per run — an architecturally significant limit absent from the boundaries.md table"}
+      ],
+      "explanation": "The retry job's per-run throughput ceiling (200 rows/run at the default 1-minute interval) directly determines how fast a growing backlog can be worked down, which is exactly the kind of I/O-map fact docs/boundaries.md exists to capture, but it's missing from the table.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f11",
+      "claim": "Subscriber resolution has a 500ms timeout, a circuit breaker (10-request window, 50% failure ratio, 30s open), and a fallback that returns an empty subscriber list",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "External calls table, line 30",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.client"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/client/SubscriptionRegistryClient.java", "line": 20, "note": "@Timeout(value = 500, unit = ChronoUnit.MILLIS)"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/client/SubscriptionRegistryClient.java", "line": 21, "note": "@CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 30, delayUnit = ChronoUnit.SECONDS)"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/client/SubscriptionRegistryClient.java", "line": 29, "note": "emptySubscriberList fallback returns List.of()"}
+      ],
+      "explanation": "Every numeric detail in the doc's table matches the annotation values exactly.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f12",
+      "claim": "Delivery attempts have no guardrail beyond the HTTP client's own defaults — subscriber URLs are third-party and there is no per-call timeout configured here",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "External calls table, line 31",
+      "classification": "confirmed",
+      "dimension": "correctness",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.service"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/service/DeliverySender.java", "line": 19, "note": "Client client = ClientBuilder.newClient() — no connect/read timeout configured anywhere on this client"}
+      ],
+      "explanation": "The doc's claim holds exactly as stated: no @Timeout, no circuit breaker, no explicit client-level timeout configuration exists on DeliverySender. This is an honest, accurate disclosure — see f38/f31 for why it's still a real architectural risk regardless of being accurately documented.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f13",
+      "claim": "webhook_delivery.id (PK, UUID) matches WebhookDelivery's @Id exactly — no composite-key or partial-mapping mismatch",
+      "doc_source": "examples/externally-deployed-config/docs/data-model.md",
+      "doc_location": "table row 1",
+      "classification": "confirmed",
+      "dimension": "data-architecture",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/sql/001-deliveries.sql", "line": 2, "note": "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/entity/WebhookDelivery.java", "line": 12, "note": "@Id private UUID id;"}
+      ],
+      "explanation": "Single-column UUID key on both sides, no composite key, no mismatch.",
+      "confidence": "high",
+      "evidence_type": ["schema", "direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f14",
+      "claim": "subscription_id is a foreign reference into subscription-registry's own storage and is not a DB-enforced FK, since that data lives in a different service's database",
+      "doc_source": "examples/externally-deployed-config/docs/data-model.md",
+      "doc_location": "table row 2",
+      "classification": "confirmed",
+      "dimension": "data-architecture",
+      "severity": "info",
+      "packages": [],
+      "evidence": [
+        {"note": "grepped 001-deliveries.sql for FOREIGN KEY/REFERENCES — none present anywhere in the file"}
+      ],
+      "explanation": "The single DDL file has no FOREIGN KEY/REFERENCES clause at all, consistent with the doc's claim that this column is intentionally not DB-enforced.",
+      "confidence": "high",
+      "evidence_type": ["schema", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"foreign key|references\" sql/ — zero matches"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f15",
+      "claim": "target_url is resolved once at ingestion time and stored on the row rather than re-resolved on every retry",
+      "doc_source": "examples/externally-deployed-config/docs/data-model.md",
+      "doc_location": "table row 3",
+      "classification": "confirmed",
+      "dimension": "data-architecture",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 35, "note": "deliverySender.attempt(delivery.getTargetUrl(), ...) reads the stored column, does not call SubscriptionRegistryClient again"}
+      ],
+      "explanation": "DeliveryRetryJob has no dependency on SubscriptionRegistryClient at all (only on DeliverySender), confirming target_url is never re-resolved on retry.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f16",
+      "claim": "status is PENDING/DELIVERED/FAILED, but FAILED is currently unreachable in code",
+      "doc_source": "examples/externally-deployed-config/docs/data-model.md",
+      "doc_location": "table row 5",
+      "classification": "confirmed",
+      "dimension": "data-architecture",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.entity", "com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"note": "searched every reference to DeliveryStatus.FAILED across src/ — the enum value exists (WebhookDelivery.java line 39) but is never assigned anywhere; the only state transitions are the PENDING constructor default and markDelivered()'s DELIVERED assignment"}
+      ],
+      "explanation": "WebhookDelivery has no 'give up'/FAILED transition method, and DeliveryRetryJob.retryDue() (the only caller of scheduleRetry) never sets it either — confirmed unreachable.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": [
+        "grep -rn \"DeliveryStatus.FAILED\" src/ — zero assignment sites, only the enum declaration itself"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f17",
+      "claim": "attempt_count is incremented on every failed retry, uncapped",
+      "doc_source": "examples/externally-deployed-config/docs/data-model.md",
+      "doc_location": "table row 6",
+      "classification": "confirmed",
+      "dimension": "data-architecture",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/entity/WebhookDelivery.java", "line": 68, "note": "scheduleRetry() does this.attemptCount++ with no bound check"}
+      ],
+      "explanation": "No ceiling check exists on attemptCount anywhere in the increment path.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f18",
+      "claim": "DeliveryRetryJob will retry a failing delivery forever — there is no attempt_count cap, no transition to FAILED, and consequently no dead-letter path for a delivery whose target_url is permanently gone",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"Known gap: retries have no ceiling\", lines 23-30",
+      "classification": "confirmed",
+      "dimension": "reliability-resilience",
+      "severity": "info",
+      "packages": ["com.example.webhookrelay.scheduler", "com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 44, "note": "on failure, only scheduleRetry() is called (attemptCount++, push nextAttemptAt out); no branch ever calls markDelivered() with a FAILED-equivalent status or removes the row from consideration"}
+      ],
+      "explanation": "This is a doc that accurately discloses its own known gap; the code matches the disclosure exactly — see f41 for the independent evaluation-pass risk assessment of this same gap (a confirmed reconciliation does not by itself make the underlying gap acceptable).",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f19",
+      "claim": "There is exactly one write path per delivery attempt — no code path writes to webhook_delivery and a second system in the same operation, so reliability-resilience.d (transaction-boundary correctness across dual writes) is legitimately not-applicable here, not a gap",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"No dual-write anywhere\", lines 32-37",
+      "classification": "misaligned",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "packages": ["com.example.webhookrelay.scheduler", "com.example.webhookrelay.service"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 35, "note": "deliverySender.attempt(...) performs an outbound POST to the subscriber (an external side effect) inside the same @Transactional retryDue() method that then updates the row's status/attemptCount"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 30, "note": "@Transactional annotation scopes the whole retryDue() loop, including the outbound POST, as one unit"}
+      ],
+      "explanation": "The doc's 'no dual-write' claim defines 'write' narrowly as a second database/system being written to — but the outbound HTTP POST to the subscriber is itself an external side effect that occurs before the local transaction commits. If the POST succeeds (the subscriber received and processed the event) and the transaction subsequently fails to commit (crash, connection loss) before markDelivered()/scheduleRetry() persist, the row remains PENDING and the next retry cycle re-POSTs the identical payload — a duplicate delivery to the subscriber. This is the same class of hazard 'dual-write' correctness checks exist to catch, just external-side-effect-plus-local-commit rather than DB-to-DB; the doc's blanket not-applicable claim doesn't hold once the outbound call is counted as the 'write' it functionally is.",
+      "recommendation": "Either reframe technical-vision.md's claim to scope it explicitly to DB-to-DB dual writes (so it stops implying the retry path has no partial-failure exposure at all), or close the actual gap: send an idempotency key/header on each delivery attempt so a subscriber can safely dedupe a retried POST that was already processed.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code"],
+      "limitations": ["Cannot observe actual runtime failure behavior (e.g., whether the JAX-RS client's post() call fully returns before the transaction's commit boundary) — this is inferred from the code structure (POST call site is inside the @Transactional method, before the entity mutations), not from an observed incident."]
+    },
+    {
+      "id": "f20",
+      "claim": "None of the four docs in this repo discuss an observability, monitoring, or metrics approach for the service at all, despite quarkus-micrometer-registry-prometheus being a declared build dependency",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "whole document — no section addresses observability",
+      "classification": "gap",
+      "dimension": "correctness",
+      "severity": "low",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/build.gradle", "line": 10, "note": "implementation 'io.quarkus:quarkus-micrometer-registry-prometheus' declared as a dependency"},
+        {"note": "searched all four docs for any mention of metrics/monitoring/observability/alerting-from-this-service's-own-code — none found (the only alerting mention is boundaries.md attributing alert thresholds to the platform team's stack, not this service's own instrumentation)"}
+      ],
+      "explanation": "A metrics library is pulled in at the build level, but no doc explains what it's used for, and (see f33/f34) no code in the repo actually emits any metric through it either — the capability is present but entirely undiscussed and unused.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "documentation", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"metric|observability|monitoring\" across all docs/*.md — no hits describing this service's own instrumentation"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f21",
+      "claim": "No stated target throughput/QPS/TPS or latency/response-time SLO for this service exists anywhere in this repository",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "\"Runtime infrastructure configuration\" paragraph, lines 37-41",
+      "classification": "risk",
+      "dimension": "scale-requirements",
+      "severity": "low",
+      "check_id": "scale-requirements.a",
+      "packages": [],
+      "evidence": [
+        {"note": "searched all four docs and application.properties for QPS/TPS/throughput/SLO/latency-target language — the only relevant text is architecture.md's own explicit statement that no such number exists in this repo, attributing it to platform-infra's HPA config instead"}
+      ],
+      "explanation": "The absence is real and repo-local, and it means every scalability judgment made elsewhere in this pass (e.g. the fixed concurrency=4 finding) is necessarily uncalibrated against an actual target — that uncertainty is carried forward explicitly rather than asserting a confident severity. Severity is kept low rather than higher specifically because the repo is unusually transparent about the limitation and names exactly where the real number lives (platform-infra), rather than silently omitting it.",
+      "confidence": "high",
+      "evidence_type": ["documentation", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"qps|tps|throughput|latency|slo|sla\" across docs/*.md and src/main/resources — no target figure found anywhere in this repo"
+      ],
+      "limitations": ["This absence is disclosed by the repo itself as deliberate (the real figure is said to live in platform-infra, out of scope for this audit) — this finding is about the repo-local absence, not a claim that no such number exists anywhere in the organization."],
+      "finding_type": "missing-requirement",
+      "impact_area": ["operability"]
+    },
+    {
+      "id": "f22",
+      "claim": "No stated growth horizon or expected-scale-in-N-years figure exists in this repo; the only volume figure present is a current-state disclosure, not a projection",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"Known gap: retries have no ceiling\" paragraph, line 29",
+      "classification": "risk",
+      "dimension": "scale-requirements",
+      "severity": "low",
+      "check_id": "scale-requirements.b",
+      "packages": [],
+      "evidence": [
+        {"note": "the only volume-related sentence anywhere in the docs is technical-vision.md's 'Current volume (low hundreds of events/day) means it hasn't caused an incident yet' — a present-tense statement, not a stated growth horizon or future-scale target"}
+      ],
+      "explanation": "This is a distinct absence from f21 (no QPS/SLO): here specifically no forward-looking scale figure ('10x by 2027'-style horizon) exists either, so a reader can't tell how much headroom the current hardcoded limits (concurrency=4, BATCH_SIZE=200) actually have before they'd need revisiting.",
+      "confidence": "high",
+      "evidence_type": ["documentation", "negative-search"],
+      "searches_performed": [
+        "re-read all four docs specifically for growth/scale-horizon language distinct from a current-volume statement — none found"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f23",
+      "claim": "No future tenants, integrations, or use cases are named anywhere in the docs for this service",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "whole document — no forward-looking integrations section",
+      "classification": "risk",
+      "dimension": "extensibility-requirements",
+      "severity": "low",
+      "check_id": "extensibility-requirements.a",
+      "packages": [],
+      "evidence": [
+        {"note": "searched all docs for named future consumers, subscriber types, or integrations — none found; technical-vision.md's forward-looking content is limited to the retry-ceiling roadmap item, which is a bug fix, not a new integration"}
+      ],
+      "explanation": "Without any named future extension target, there's no concrete bar to judge the current design's extensibility against beyond the general shape of the code (see f32 for that separate, positive finding).",
+      "confidence": "high",
+      "evidence_type": ["documentation", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"future|roadmap|tenant|integration|upcoming\" across docs/*.md — only the retry-ceiling roadmap item matched, which is not a new-integration statement"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f24",
+      "claim": "No stated bar exists anywhere for how fast or cheaply a new event type or consumer must be addable to this service",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "whole document — no stated extension-cost bar",
+      "classification": "risk",
+      "dimension": "extensibility-requirements",
+      "severity": "low",
+      "check_id": "extensibility-requirements.b",
+      "packages": [],
+      "evidence": [
+        {"note": "searched all docs for any stated timeline/cost bar for adding a new event type, subscriber category, or consumer — none found"}
+      ],
+      "explanation": "This is a distinct fact from f23 (naming future use cases is not the same as stating a cost bar for adding one) — both are independently absent here.",
+      "confidence": "high",
+      "evidence_type": ["documentation", "negative-search"],
+      "searches_performed": [
+        "re-read all docs specifically for a stated addition-speed/cost bar — none found"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f25",
+      "claim": "(Architectural evaluation) A real, substantive technical-vision document exists for this service, explaining rationale and disclosing known gaps rather than being empty scaffolding",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "whole document",
+      "classification": "strength",
+      "dimension": "vision-alignment",
+      "severity": "info",
+      "check_id": "vision-alignment.a",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/docs/technical-vision.md", "line": 23, "note": "\"Known gap: retries have no ceiling\" section explicitly names a real, current gap and frames it honestly rather than hiding it"}
+      ],
+      "explanation": "technical-vision.md substantively explains why infrastructure config lives elsewhere, why subscriber management is a separate service, and explicitly discloses the retry-ceiling gap as real and unresolved rather than glossing over it. This is a genuinely useful vision document, not scaffolding — worth crediting and preserving as the team evolves the service.",
+      "confidence": "high",
+      "evidence_type": ["documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f26",
+      "claim": "technical-vision.md's confident 'no dual-write anywhere' claim does not hold once the retry job's outbound POST is counted as the external side effect it functionally is",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"No dual-write anywhere\", lines 32-37",
+      "classification": "risk",
+      "dimension": "vision-alignment",
+      "severity": "low",
+      "check_id": "vision-alignment.b",
+      "packages": ["com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 35, "note": "same POST-inside-transaction evidence as f19/f40"}
+      ],
+      "explanation": "Distinct from f19 (which is about textual accuracy of the doc claim) and f40 (which is about the operational consequence): this finding is specifically about vision-document fidelity — a confidently-worded architectural guarantee in the vision doc turns out not to hold under direct code inspection, which matters for how much a reader should trust the doc's other confident claims.",
+      "recommendation": "Narrow the vision doc's claim to explicitly scope it to database-to-database dual writes, so it stops implying the retry path is free of partial-failure exposure.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f27",
+      "claim": "(Architectural evaluation) The vision doc's disclosed 'retries have no ceiling' known-gap statement matches the code exactly, with no silent drift between what's disclosed and what's actually implemented",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"Known gap: retries have no ceiling\", lines 23-30",
+      "classification": "strength",
+      "dimension": "vision-alignment",
+      "severity": "info",
+      "check_id": "vision-alignment.b",
+      "packages": ["com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 44, "note": "same evidence as f18 — no cap, no FAILED transition, matching the disclosure exactly"}
+      ],
+      "explanation": "Unlike the dual-write claim (f26), this is a case where the vision doc makes a specific, checkable claim about a known gap and the code matches it precisely — a positive data point for the doc's overall trustworthiness, worth crediting alongside f26's negative one rather than letting one miss color the whole document's reputation.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f28",
+      "claim": "(Architectural evaluation) The webhook_delivery schema already has the exact structure (a status enum including FAILED) needed to support the one thing the vision doc names as forthcoming work — closing the retry-ceiling gap — without requiring a migration",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"Known gap: retries have no ceiling\", lines 23-30",
+      "classification": "strength",
+      "dimension": "data-architecture",
+      "severity": "info",
+      "check_id": "data-architecture.f",
+      "packages": ["com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/sql/001-deliveries.sql", "line": 6, "note": "status VARCHAR(16) NOT NULL DEFAULT 'PENDING' — column already sized/typed to hold 'FAILED'"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/entity/WebhookDelivery.java", "line": 39, "note": "enum DeliveryStatus { PENDING, DELIVERED, FAILED } — FAILED already declared, just unused"}
+      ],
+      "explanation": "Closing the disclosed retry-ceiling gap only requires application logic (a cap check + a code path that sets FAILED) — the DDL and the ORM mapping are already forward-ready for it, so the fix is a pure code change with zero schema migration risk.",
+      "confidence": "high",
+      "evidence_type": ["schema", "direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f29",
+      "claim": "domain-events-pool.max-concurrency is hardcoded to 4 with no environment override, on the single event-ingestion path this service has",
+      "doc_source": "examples/externally-deployed-config/docs/architecture.md",
+      "doc_location": "lines 45-49",
+      "classification": "risk",
+      "dimension": "scalability",
+      "severity": "medium",
+      "check_id": "scalability.a",
+      "packages": ["com.example.webhookrelay.consumer"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/resources/application.properties", "line": 7, "note": "domain-events-pool.max-concurrency=4, bare literal"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 29, "note": "@Blocking(value = \"domain-events-pool\", ordered = false) binds the consumer to that fixed-size pool"}
+      ],
+      "explanation": "Raising throughput on the only ingestion path requires editing this literal and redeploying, not a config change — and per f21/f22, there is no documented QPS target or growth horizon to say whether 4 is comfortably above or dangerously close to actual peak load, so this severity is necessarily an uncalibrated judgment (carried forward per scale-requirements.c).",
+      "recommendation": "Make domain-events-pool.max-concurrency an env-overridable property (mirroring RETRY_JOB_INTERVAL's pattern) so capacity can be tuned without a redeploy, and pair it with a documented target throughput so the right value can actually be chosen.",
+      "confidence": "high",
+      "evidence_type": ["configuration", "direct-code"],
+      "limitations": ["Severity here is calibrated without a stated QPS/throughput target — see f21."]
+    },
+    {
+      "id": "f30",
+      "claim": "DeliveryRetryJob's BATCH_SIZE=200 is a hardcoded, undocumented cap on how many due deliveries are retried per interval, with no environment override",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "Scheduled Jobs table, lines 20-24 (no batch-size column present)",
+      "classification": "risk",
+      "dimension": "scalability",
+      "severity": "medium",
+      "check_id": "scalability.a",
+      "packages": ["com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 28, "note": "private static final int BATCH_SIZE = 200; — literal, no @ConfigProperty"}
+      ],
+      "explanation": "This caps recovery throughput at 200 rows per interval (default 1 minute). Combined with the uncapped-retry gap (f18/f41), a backlog of permanently-failing rows would consume retry slots forever and could eventually push legitimate still-recoverable deliveries out past the batch window, silently slowing recovery for everyone else — a second-order consequence of the retry-ceiling gap that's easy to miss looking at either issue alone.",
+      "recommendation": "Make BATCH_SIZE configurable, and prioritize the retry query so freshly-failing deliveries aren't starved behind a growing pool of forever-retrying ones once the retry-ceiling gap is fixed.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f31",
+      "claim": "DeliverySender's outbound call to a subscriber's target_url has no timeout, retry budget, or circuit breaker configured, unlike the structurally similar SubscriptionRegistryClient call in the same codebase",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "External calls table, lines 30-31",
+      "classification": "risk",
+      "dimension": "performance-cost",
+      "severity": "high",
+      "check_id": "performance-cost.a",
+      "packages": ["com.example.webhookrelay.service", "com.example.webhookrelay.client"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/service/DeliverySender.java", "line": 19, "note": "ClientBuilder.newClient() — no timeout configuration"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/client/SubscriptionRegistryClient.java", "line": 20, "note": "@Timeout(500ms) + @CircuitBreaker on the comparable external call"}
+      ],
+      "explanation": "Two structurally identical situations (an outbound call to a service this team doesn't control) are guarded completely differently in the same codebase: the registry call gets a 500ms timeout, a circuit breaker, and a safe fallback; the delivery call gets none of that. This inconsistency is a stronger finding than 'no rate limit' in isolation, because the team has clearly already shown it knows how to guard exactly this kind of call.",
+      "recommendation": "Apply the same @Timeout (and consider a per-subscriber circuit breaker) to DeliverySender.attempt that SubscriptionRegistryClient already uses — the pattern to copy already exists in this codebase.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f32",
+      "claim": "(Architectural evaluation) Adding support for a new domain-event type requires zero code changes in webhook-relay, because the consumer and subscriber-resolution path are already fully generic",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "strength",
+      "dimension": "extensibility",
+      "severity": "info",
+      "check_id": "extensibility.a",
+      "packages": ["com.example.webhookrelay.consumer"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 32, "note": "registryClient.resolveSubscribers(event.type()) — subscriber resolution is data-driven by event.type(), not a hardcoded switch/if-chain per event type"}
+      ],
+      "explanation": "DomainEventConsumer never branches on the specific event type — it always asks the registry who cares and relays to them. A new event type flowing through the same domain-events topic requires no new consumer code, no new branch, and no redeploy of this service at all (only a subscription-registry entry). This is a clean extension point worth preserving as the system grows.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f33",
+      "claim": "Neither of this service's two critical logic paths — event ingestion (DomainEventConsumer) or delivery retry (DeliveryRetryJob) — emits any of the four golden signals (traffic, errors, latency, saturation)",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "high",
+      "check_id": "observability.a",
+      "packages": ["com.example.webhookrelay.consumer", "com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"note": "grepped the entire src/ tree for metric/counter/gauge/timer/micrometer/log usage — zero matches anywhere, including in DomainEventConsumer.java and DeliveryRetryJob.java"}
+      ],
+      "explanation": "Traffic (events consumed, deliveries attempted), errors (registry failures, delivery failures), latency (delivery attempt duration), and saturation (consumer-pool utilization, retry-queue depth) are all absent — not just one of the four missing while others are covered, which is the more common failure mode this check exists to catch; here all four are missing on both critical paths simultaneously, despite quarkus-micrometer-registry-prometheus being a declared dependency (see f20) that is never actually used.",
+      "recommendation": "Instrument at minimum: a counter for events consumed and deliveries attempted/succeeded/failed, a timer around DeliverySender.attempt, and a gauge/counter for retry-queue depth (count of PENDING rows) — the last one specifically because it's the saturation signal that would catch the retry-ceiling gap (f41) in production before it silently accumulates.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"metric|counter|gauge|timer|micrometer|log\\.|logger\" src/ — zero matches in the entire source tree"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f34",
+      "claim": "DeliveryRetryJob — the code path responsible for recovering from delivery failures — produces no output of any kind (not a metric, not even a log line) describing its outcome",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "observability",
+      "severity": "high",
+      "check_id": "observability.b",
+      "packages": ["com.example.webhookrelay.scheduler", "com.example.webhookrelay.service"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 39, "note": "the else-branch comment explains the forever-retry behavior in prose, but the actual code path has no logger call and no metric emission — the explanation exists only as a source comment for a future reader, not as runtime output"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/service/DeliverySender.java", "line": 26, "note": "catch (Exception e) { return false; } — the exception itself (which would show a DNS failure vs. a 404 vs. a timeout) is discarded, not logged"}
+      ],
+      "explanation": "This is a stricter finding than 'only a log line, not a metric' (the rubric's usual failure mode) — here there is neither. A subscriber's endpoint being permanently gone produces literally zero operator-visible signal: no counter increments, no log entry, not even the underlying exception type. Combined with f33 (no saturation metric on the retry queue) and f41 (no ceiling on retries), an operator has no way to learn this is happening short of querying the database directly.",
+      "recommendation": "At minimum, log the discarded exception in DeliverySender's catch block (currently silently swallowed), and add a counter/gauge in DeliveryRetryJob distinguishing 'delivered this run' from 'still pending' from 'attempt_count exceeds N' once a ceiling exists.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f35",
+      "claim": "This repo has no commit history at all to compute a bus-factor/contributor-concentration signal from",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "maintainability",
+      "severity": "low",
+      "check_id": "maintainability.a",
+      "packages": [],
+      "evidence": [
+        {"note": "analysis/churn.json (provided, git/log-derived) has empty files/packages/package_authors/bus_factor_hotspots/high_diversity_hotspots — consistent with `git log` showing zero commits and `git status` showing the entire directory as untracked"}
+      ],
+      "explanation": "Per the maintainability checklist, a thin/absent history is still a real (if low-confidence) finding about bus-factor risk, not a reason to mark this not-applicable — the concept (contributor concentration) exists for any codebase with at least one author, it just can't be measured yet here because the code has never been committed to this repository's history.",
+      "confidence": "low",
+      "evidence_type": ["git-history"],
+      "searches_performed": [
+        "git log --no-merges --pretty=format:%an -- examples/externally-deployed-config/ — zero output",
+        "git log --oneline -- examples/externally-deployed-config/ — zero commits",
+        "git status --porcelain examples/externally-deployed-config/ — reports the entire directory as untracked (??)"
+      ],
+      "limitations": ["No commit history exists for this path at all (untracked in git) — this finding is a disclosed absence of signal, not a positive bus-factor conclusion of any kind."]
+    },
+    {
+      "id": "f36",
+      "claim": "DeliveryRetryJob resends the identical payload to a subscriber on every retry with no idempotency key or header, so a subscriber that already processed a request but whose acknowledgment was lost will receive and potentially reprocess a duplicate",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "high",
+      "check_id": "reliability-resilience.a",
+      "packages": ["com.example.webhookrelay.service", "com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/service/DeliverySender.java", "line": 22, "note": "client.target(targetUrl).request().post(Entity.entity(payload, ...)) — no idempotency-key header or body field sent"}
+      ],
+      "explanation": "Any retry-on-failure design needs the retried operation to be safely repeatable by whoever's on the receiving end; here the receiving end (a third-party subscriber) has no way to recognize a retried delivery as a duplicate of one it may have already processed, because nothing distinguishing identifies the attempt from the original.",
+      "recommendation": "Send a stable idempotency key (e.g. the delivery row's own UUID id) as a header on every attempt, and document the expectation that subscribers dedupe on it.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f37",
+      "claim": "DomainEventConsumer has no event-level dedup (no unique constraint or idempotency key derived from the source Kafka event) — a Kafka at-least-once redelivery of the same event would create a second, duplicate set of webhook_delivery rows",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "check_id": "reliability-resilience.a",
+      "packages": ["com.example.webhookrelay.consumer", "com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 33, "note": "new WebhookDelivery(UUID.randomUUID(), ...) — a fresh random id is generated per invocation, with nothing tying it back to the source Kafka event/offset for dedup"}
+      ],
+      "explanation": "This is distinct from f36 (which is about the delivery-side retry, not ingestion): if the consumer crashes after persisting delivery rows but before its Kafka offset commits (an ordinary at-least-once redelivery scenario, not an edge case), the same domain event will be reprocessed and a second full set of delivery rows created for every subscriber, each independently delivered.",
+      "recommendation": "Derive a deterministic idempotency key from the source Kafka event (e.g. topic+partition+offset, or an event id if the payload carries one) and add a unique constraint so a redelivered event can't create duplicate delivery rows.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code"],
+      "limitations": ["Whether Kafka redelivery actually occurs in practice depends on the consumer's commit-strategy configuration, which uses the connector's defaults here (not overridden in application.properties) — this finding is about the code's lack of a dedup mechanism, which matters regardless of how often redelivery actually happens at the configured commit strategy."]
+    },
+    {
+      "id": "f38",
+      "claim": "DeliverySender.attempt has no per-call timeout or circuit breaker, so a single hanging subscriber can stall the entire single-threaded DeliveryRetryJob run, delaying every other pending delivery in that batch",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "External calls table, line 31",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "high",
+      "check_id": "reliability-resilience.b",
+      "packages": ["com.example.webhookrelay.service", "com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/service/DeliverySender.java", "line": 19, "note": "no timeout on the JAX-RS client"},
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 34, "note": "for (WebhookDelivery delivery : due) processes up to BATCH_SIZE deliveries sequentially, one deliverySender.attempt() call at a time, inside one @Scheduled run"}
+      ],
+      "explanation": "Distinct from f31 (which frames this as a cost-guardrail inconsistency): this is the availability-cascade consequence specifically — because the retry loop is sequential and single-threaded per run, one unresponsive target_url with no timeout can block the entire run indefinitely, meaning every other subscriber's pending deliveries in that batch are delayed by however long that one hang lasts, with no isolation between subscribers.",
+      "recommendation": "Add a per-call timeout (even a generous one, e.g. 10-30s) to DeliverySender's client so one hanging subscriber can't block delivery to every other subscriber in the same run.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f39",
+      "claim": "The domain-events consumer has no dead-letter topic and no failure-strategy override, meaning an unhandled exception in onEvent() (e.g. a persistence failure) would be handled by the messaging connector's default failure strategy, which can halt the channel rather than skip the one bad message",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "Message Consumers table, line 18",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "high",
+      "check_id": "reliability-resilience.c",
+      "packages": ["com.example.webhookrelay.consumer"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 28, "note": "@Incoming(\"domain-events\") has no failure-strategy attribute; application.properties has no mp.messaging.incoming.domain-events.failure-strategy override either"}
+      ],
+      "explanation": "SmallRye Reactive Messaging's Kafka connector default failure strategy on an unhandled exception is to fail (stop) the channel rather than skip-and-continue, unless explicitly configured otherwise — none of the other options (ignore, dead-letter-queue) are configured here. Combined with f33/f34 (zero observability on this path), a single malformed event or transient persistence error could silently halt all future event ingestion for this service until an operator notices independently and restarts it.",
+      "recommendation": "Configure an explicit failure-strategy (at minimum a dead-letter-topic, so a bad message is quarantined rather than either dropped silently or killing the whole channel), and add a counter on consumer failures so this is operator-visible if it happens.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "configuration"],
+      "limitations": ["The exact default failure-strategy behavior depends on the SmallRye Reactive Messaging Kafka connector version in use, which isn't pinned to a specific version anywhere visible in this repo (build.gradle uses the Quarkus BOM without an explicit connector version) — the 'fail-the-channel' default is the well-documented SmallRye Kafka behavior as of recent Quarkus versions, but this repo doesn't let it be pinned down further."]
+    },
+    {
+      "id": "f40",
+      "claim": "DeliveryRetryJob's outbound POST-then-local-commit sequence is a two-step operation (an external side effect followed by a local database commit) with a real, undocumented inconsistency window if the transaction fails to commit after the POST already succeeded",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "check_id": "reliability-resilience.d",
+      "packages": ["com.example.webhookrelay.scheduler"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 35, "note": "deliverySender.attempt(...) (external POST) happens, then markDelivered()/scheduleRetry() (local state change) happens, both inside the same @Transactional method"}
+      ],
+      "explanation": "This is the same underlying code path as f19/f26 but framed as its own operational-risk check (reliability-resilience.d), independent of whether the vision doc's wording about it holds up: regardless of what the doc claims, the actual failure mode — POST succeeds, commit fails, retry re-sends — is a real inconsistency window with no outbox/compensating-action pattern to close it.",
+      "recommendation": "Same as f36: an idempotency key on the outbound POST closes this gap from the subscriber's side even without changing the transaction structure on this service's side.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f41",
+      "claim": "The disclosed retry-ceiling gap (infinite retry, no FAILED transition, no dead-letter path) leaves this service with no actual recovery mechanism for a permanently-undeliverable event, and — because of f33/f34's observability gap — no way for an operator to notice it happening except by directly querying the database",
+      "doc_source": "examples/externally-deployed-config/docs/technical-vision.md",
+      "doc_location": "\"Known gap: retries have no ceiling\", lines 23-30",
+      "classification": "risk",
+      "dimension": "reliability-resilience",
+      "severity": "medium",
+      "check_id": "reliability-resilience.e",
+      "packages": ["com.example.webhookrelay.scheduler", "com.example.webhookrelay.entity"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java", "line": 44, "note": "same evidence as f18 — no cap, no FAILED transition"}
+      ],
+      "explanation": "The doc is honest that current low volume has kept this from causing an incident, which is why severity is kept at medium rather than high — but the gap is compounded by having zero visibility into it (f33/f34): even when it does start accumulating (e.g. after a subscriber decommissions an endpoint without unsubscribing), nothing in this service will surface it.",
+      "recommendation": "Add an attempt_count ceiling with a transition to FAILED, and — regardless of whether the ceiling fix ships immediately — add a gauge/alert on count of rows with attempt_count above some threshold, so the gap is operator-visible even before it's closed.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "documentation"],
+      "limitations": []
+    },
+    {
+      "id": "f42",
+      "claim": "No versioning or deprecation policy is stated anywhere for the domain-events Kafka event schema or the /api/v1/ REST path, beyond the 'v1' naming convention itself implying a future v2 is anticipated",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "HTTP API table, line 9",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "low",
+      "check_id": "change-safety.a",
+      "packages": [],
+      "evidence": [
+        {"note": "searched all docs for a stated deprecation policy or versioning convention beyond the bare 'v1' path segment — none found; DomainEvent (consumer/DomainEventConsumer.java line 44) has no version field at all"}
+      ],
+      "explanation": "The '/api/v1/' path implies the team anticipated future versions, but nothing states what happens to v1 when a v2 arrives, and the Kafka event schema has no version discriminator at all.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code", "documentation", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"deprecat|v2|version\" across docs and src — no versioning policy found beyond the bare 'v1' path segment"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f43",
+      "claim": "Only one migration file exists (001-deliveries.sql), so there isn't yet enough schema-change history to show whether this team follows an expand/contract discipline in practice",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "low",
+      "check_id": "change-safety.b",
+      "packages": [],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/sql", "line": 1, "note": "directory listing: exactly one file, 001-deliveries.sql — no second migration to compare against"}
+      ],
+      "explanation": "Per the change-safety checklist, a young/small schema history is itself a real finding — the absence of an established migration convention or tooling (no Flyway/Liquibase reference anywhere, just a bare numbered .sql file) — not evidence that a breaking change was caught happening, since none has occurred yet.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": [
+        "find sql/ -type f — exactly one migration file exists"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f44",
+      "claim": "DomainEvent's deserialization has no explicit lenient/unknown-field configuration, so a producer adding a new field to the event payload could break consumer deserialization depending on the runtime Jackson configuration's default strictness",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "medium",
+      "check_id": "change-safety.c",
+      "packages": ["com.example.webhookrelay.consumer"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java", "line": 44, "note": "public record DomainEvent(String type, String payload) {} — no @JsonIgnoreProperties(ignoreUnknown = true) or equivalent lenient-deserialization annotation"}
+      ],
+      "explanation": "Whether this actually breaks on a new field depends on the Jackson/Quarkus runtime configuration's default strictness, which isn't visible or overridden anywhere in this repo — this finding is about the absence of an explicit forward-compatibility guarantee at the code level, not a confirmed runtime failure.",
+      "recommendation": "Add explicit unknown-field tolerance (or confirm and document the runtime default) so producers can safely add fields to the event payload without a coordinated consumer deploy.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code"],
+      "limitations": ["Actual deserialization strictness depends on Quarkus/Jackson runtime configuration not visible in this repo (no explicit ObjectMapper customization found) — this is a contract-shape observation, not an observed runtime failure."]
+    },
+    {
+      "id": "f45",
+      "claim": "No feature-flag, canary, or percentage-rollout mechanism exists anywhere in this codebase — every deploy is all-or-nothing",
+      "doc_source": "no explicit doc claim — evaluated directly against code",
+      "doc_location": "n/a",
+      "classification": "risk",
+      "dimension": "change-safety",
+      "severity": "low",
+      "check_id": "change-safety.e",
+      "packages": [],
+      "evidence": [
+        {"note": "searched src/ for any flag/toggle/canary/percentage-rollout mechanism — none found"}
+      ],
+      "explanation": "For a service whose riskiest likely future change is closing the retry-ceiling gap (a behavior change to when deliveries stop retrying), having no gradual-rollout mechanism means that change ships to 100% of traffic at once with no ability to dial it back incrementally if the new FAILED-transition logic has a bug.",
+      "confidence": "high",
+      "evidence_type": ["direct-code", "negative-search"],
+      "searches_performed": [
+        "grep -rniE \"flag|toggle|canary|rollout\" src/ — no matches"
+      ],
+      "limitations": []
+    },
+    {
+      "id": "f46",
+      "claim": "(Architectural evaluation) The single externally-reachable HTTP entry point in this service is protected by one global, no-opt-out authentication filter, giving it consistent auth coverage by construction rather than by convention",
+      "doc_source": "examples/externally-deployed-config/docs/boundaries.md",
+      "doc_location": "HTTP API table, line 9",
+      "classification": "strength",
+      "dimension": "security-boundaries",
+      "severity": "info",
+      "check_id": "security-boundaries.a",
+      "packages": ["com.example.webhookrelay.security"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/security/AuthenticationFilter.java", "line": 17, "note": "@Provider @Priority(Priorities.AUTHENTICATION) — a global JAX-RS filter with no per-resource opt-in mechanism visible anywhere"}
+      ],
+      "explanation": "Because the filter is registered globally rather than annotated per-resource, there's no way for a future new endpoint to accidentally launch unprotected — the inconsistency this check usually looks for (some endpoints protected, siblings not) is structurally prevented here rather than just currently true by coincidence.",
+      "confidence": "high",
+      "evidence_type": ["direct-code"],
+      "limitations": []
+    },
+    {
+      "id": "f47",
+      "claim": "DeliverySender posts to target_url exactly as resolved from SubscriptionRegistryClient with no validation of scheme or host, so a compromised or misconfigured subscription-registry entry could direct this service to make requests to internal infrastructure",
+      "doc_source": "examples/externally-deployed-config/docs/data-model.md",
+      "doc_location": "table row 3 (target_url column)",
+      "classification": "risk",
+      "dimension": "security-boundaries",
+      "severity": "high",
+      "check_id": "security-boundaries.d",
+      "packages": ["com.example.webhookrelay.service"],
+      "evidence": [
+        {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/service/DeliverySender.java", "line": 22, "note": "client.target(targetUrl) — targetUrl is used directly with no scheme allow-list, no private/internal-IP blocklist, no host validation of any kind"}
+      ],
+      "explanation": "target_url crosses a real trust boundary: it originates from a separate service (subscription-registry) and is trusted implicitly by DeliverySender, which will POST the domain event's payload to whatever URL that service returns. If subscription-registry is ever compromised, misconfigured, or has a validation gap of its own that lets a subscriber register an internal-network URL, this service becomes a vector for making authenticated-looking outbound requests to internal infrastructure (an SSRF-shaped risk) — and per f34, such a request would produce no operator-visible signal either way.",
+      "recommendation": "Validate target_url before use (https-only, reject private/loopback/link-local IP ranges and cloud metadata addresses) either in this service or, more centrally, at write-time in subscription-registry, and treat this as a cross-service trust-boundary decision that needs to be made explicitly rather than left implicit.",
+      "confidence": "medium",
+      "evidence_type": ["direct-code"],
+      "limitations": ["Whether subscription-registry itself validates target_url on write is out of scope for this repo — this finding is about the absence of any validation on the receiving/using side, which is a defense-in-depth gap regardless of what the other service does."]
+    }
+  ]
+}

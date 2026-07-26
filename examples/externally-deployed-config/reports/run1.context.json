@@ -1,0 +1,18 @@
+{
+  "system_type": "production-service",
+  "criticality": "customer-facing",
+  "lifecycle": "active",
+  "deployment_model": "multi-instance-service",
+  "data_sensitivity": "unknown",
+  "expected_scale": "low hundreds of events/day (current volume, per docs/technical-vision.md — not a stated target or growth horizon; see scale-requirements.a/b findings for the absence of either)",
+  "confidence": "high",
+  "classification_evidence": [
+    "src/main/java/.../consumer/DomainEventConsumer.java is a Kafka @Incoming message consumer with @Blocking/@Transactional processing — a running service entry point, not a library or CLI.",
+    "src/main/java/.../scheduler/DeliveryRetryJob.java is a @Scheduled recurring job alongside the consumer — combined with the consumer and the REST resource below, this is a multi-entry-point long-running service, not a batch-job-only shape.",
+    "src/main/java/.../resource/DeliveryResource.java exposes a JAX-RS @GET REST endpoint guarded by a global AuthenticationFilter — a live HTTP surface.",
+    "build.gradle's own comment states: 'Illustrative only — not a buildable project. Exists so this fixture reads like a real Quarkus/Gradle service; there is nothing to compile or run here.' Per references/system-classification.md's explicit guidance, an illustrative/non-buildable fixture with real entry points (REST resource, message consumer, scheduled job) is still classified by its architectural shape, not its disclaimer — so this stays production-service rather than being bucketed as a 'fixture' or 'prototype'. Confidence is kept at 'high' rather than lowered for this tension, per the same guidance, because the shape itself (consumer + scheduler + REST resource + entity + repository) is unambiguous.",
+    "No deployment manifest (Kubernetes Deployment/HPA/alerting-rule file), Dockerfile, or CI/deploy config exists anywhere in this repo — docs/architecture.md and docs/technical-vision.md both explicitly and consistently attribute this to a deliberate split (those artifacts live in a separate platform-infra repo), not to the repo being unfinished or a prototype. This absence is therefore not treated as prototype-type evidence (per system-classification.md, 'prototype' needs affirmative WIP/experimental/no-deploy-path-anywhere evidence, and here the missing deploy path is explicitly and consistently explained as living elsewhere, which is a materially different situation from a genuine no-deploy-path absence).",
+    "deployment_model is set to 'multi-instance-service' at medium-confidence-within-a-high-confidence system_type: no deployment manifest exists in this repo to confirm replica count directly, but Kafka consumer-group semantics and the docs' explicit mention of 'replica count' and 'horizontal autoscaling policy' as platform-infra-managed concepts imply more than one instance is the intended operating mode; this is inferred, not confirmed in-repo.",
+    "data_sensitivity is 'unknown' rather than a guess: the webhook_delivery.payload column stores an opaque, arbitrary domain-event JSON body (sql/001-deliveries.sql line 5) whose schema/contents are not defined anywhere in this repo, so no positive claim about PII/financial content can be made from repo evidence alone."
+  ]
+}

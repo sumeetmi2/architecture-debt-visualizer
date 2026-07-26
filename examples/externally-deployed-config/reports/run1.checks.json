@@ -1,0 +1,53 @@
+{
+  "checks": [
+    {"id": "scale-requirements.a", "dimension": "scale-requirements", "status": "risk", "scope": ["docs/architecture.md"], "confidence": "high", "finding_ids": ["f21"]},
+    {"id": "scale-requirements.b", "dimension": "scale-requirements", "status": "risk", "scope": ["docs/technical-vision.md"], "confidence": "high", "finding_ids": ["f22"]},
+    {"id": "scale-requirements.c", "dimension": "scale-requirements", "status": "clean", "scope": ["scalability.a carry-forward"], "confidence": "high", "evidence": [{"file": "examples/externally-deployed-config/src/main/resources/application.properties", "line": 7, "note": "Absence of a stated QPS/growth target (f21/f22) was carried forward explicitly into f29's severity framing (concurrency=4 judged as 'necessarily uncalibrated') rather than asserting an unearned confident severity."}]},
+
+    {"id": "extensibility-requirements.a", "dimension": "extensibility-requirements", "status": "risk", "scope": ["docs/technical-vision.md"], "confidence": "high", "finding_ids": ["f23"]},
+    {"id": "extensibility-requirements.b", "dimension": "extensibility-requirements", "status": "risk", "scope": ["docs (all)"], "confidence": "high", "finding_ids": ["f24"]},
+
+    {"id": "vision-alignment.a", "dimension": "vision-alignment", "status": "strength", "scope": ["docs/technical-vision.md"], "confidence": "high", "finding_ids": ["f25"]},
+    {"id": "vision-alignment.b", "dimension": "vision-alignment", "status": "risk", "scope": ["technical-vision.md: no-dual-write claim"], "confidence": "medium", "finding_ids": ["f26"]},
+    {"id": "vision-alignment.b", "dimension": "vision-alignment", "status": "strength", "scope": ["technical-vision.md: retry-ceiling known-gap disclosure"], "confidence": "high", "finding_ids": ["f27"]},
+
+    {"id": "data-architecture.a", "dimension": "data-architecture", "status": "clean", "scope": ["WebhookDelivery / webhook_delivery.id"], "confidence": "high", "evidence": [{"file": "examples/externally-deployed-config/sql/001-deliveries.sql", "line": 2}, {"file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/entity/WebhookDelivery.java", "line": 12}]},
+    {"id": "data-architecture.b", "dimension": "data-architecture", "status": "clean", "scope": ["webhook_delivery columns"], "confidence": "high", "evidence": [{"file": "examples/externally-deployed-config/sql/001-deliveries.sql", "line": 1, "note": "all 9 columns follow consistent snake_case naming; no near-duplicate/renamed-column clusters found in this single-table, single-migration schema"}]},
+    {"id": "data-architecture.c", "dimension": "data-architecture", "status": "clean", "scope": ["all DDL files (sql/001-deliveries.sql)"], "confidence": "high", "evidence": [{"file": "examples/externally-deployed-config/sql/001-deliveries.sql", "line": 1, "note": "no FOREIGN KEY/REFERENCES anywhere in the only DDL file; the one candidate column (subscription_id) is deliberately and correctly documented as not DB-enforced since the referenced data lives in another service's database (see f14)"}]},
+    {"id": "data-architecture.d", "dimension": "data-architecture", "status": "not-applicable", "scope": ["webhook_delivery"], "reason": "Single small table at disclosed low-hundreds/day volume, no partition list or date horizon exists to check for staleness — there is nothing to maintain yet, matching data-model.md's own stated not-applicable framing (independently verified, not just taken on the doc's word)."},
+    {"id": "data-architecture.e", "dimension": "data-architecture", "status": "not-applicable", "scope": ["webhook_delivery"], "reason": "No monetary or quantity-bearing columns exist anywhere in this schema (payload is an opaque JSONB blob, not a decomposed monetary field) — there is no decimal-vs-float type decision to have gotten right or wrong."},
+    {"id": "data-architecture.f", "dimension": "data-architecture", "status": "strength", "scope": ["webhook_delivery.status"], "confidence": "high", "finding_ids": ["f28"]},
+    {"id": "data-architecture.g", "dimension": "data-architecture", "status": "not-applicable", "scope": ["webhook_delivery.payload"], "reason": "payload is the intentional, sole representation of the event body (there is no other columnar table storing the same domain event data elsewhere) — not a shadow/parallel duplicate of anything."},
+
+    {"id": "scalability.a", "dimension": "scalability", "status": "risk", "scope": ["domain-events-pool.max-concurrency", "DeliveryRetryJob.BATCH_SIZE"], "confidence": "high", "finding_ids": ["f29", "f30"]},
+
+    {"id": "performance-cost.a", "dimension": "performance-cost", "status": "risk", "scope": ["DeliverySender.attempt vs SubscriptionRegistryClient.resolveSubscribers"], "confidence": "high", "finding_ids": ["f31"]},
+
+    {"id": "extensibility.a", "dimension": "extensibility", "status": "strength", "scope": ["DomainEventConsumer"], "confidence": "high", "finding_ids": ["f32"]},
+    {"id": "extensibility.b", "dimension": "extensibility", "status": "not-applicable", "scope": ["repo-wide"], "reason": "Only one consumer/integration pattern exists in this repo (a single Kafka channel handled generically) — there is no second instance of a conceptually-identical concern to compare it against for consistency."},
+
+    {"id": "observability.a", "dimension": "observability", "status": "risk", "scope": ["DomainEventConsumer", "DeliveryRetryJob"], "confidence": "high", "finding_ids": ["f33"]},
+    {"id": "observability.b", "dimension": "observability", "status": "risk", "scope": ["DeliveryRetryJob recovery path"], "confidence": "high", "finding_ids": ["f34"]},
+
+    {"id": "maintainability.a", "dimension": "maintainability", "status": "risk", "scope": ["repo-wide git history"], "confidence": "low", "finding_ids": ["f35"]},
+    {"id": "maintainability.b", "dimension": "maintainability", "status": "not-applicable", "scope": ["repo-wide"], "reason": "extensibility.a found a single, consistently-applied generic pattern with no inconsistent adoption anywhere in this repo — there is no inconsistency cost to assess since there is no inconsistency."},
+
+    {"id": "reliability-resilience.a", "dimension": "reliability-resilience", "status": "risk", "scope": ["DeliverySender retry path", "DomainEventConsumer ingestion path"], "confidence": "high", "finding_ids": ["f36", "f37"]},
+    {"id": "reliability-resilience.b", "dimension": "reliability-resilience", "status": "risk", "scope": ["DeliverySender.attempt"], "confidence": "high", "finding_ids": ["f38"]},
+    {"id": "reliability-resilience.c", "dimension": "reliability-resilience", "status": "risk", "scope": ["domain-events consumer"], "confidence": "medium", "finding_ids": ["f39"]},
+    {"id": "reliability-resilience.d", "dimension": "reliability-resilience", "status": "risk", "scope": ["DeliveryRetryJob.retryDue"], "confidence": "medium", "finding_ids": ["f40"]},
+    {"id": "reliability-resilience.e", "dimension": "reliability-resilience", "status": "risk", "scope": ["DeliveryRetryJob recovery mechanism"], "confidence": "high", "finding_ids": ["f41"]},
+
+    {"id": "change-safety.a", "dimension": "change-safety", "status": "risk", "scope": ["DeliveryResource /api/v1", "DomainEvent schema"], "confidence": "medium", "finding_ids": ["f42"]},
+    {"id": "change-safety.b", "dimension": "change-safety", "status": "risk", "scope": ["sql/ migration history"], "confidence": "high", "finding_ids": ["f43"]},
+    {"id": "change-safety.c", "dimension": "change-safety", "status": "risk", "scope": ["DomainEvent deserialization"], "confidence": "medium", "finding_ids": ["f44"]},
+    {"id": "change-safety.d", "dimension": "change-safety", "status": "not-applicable", "scope": ["sql/ migration history"], "reason": "Only one, purely-additive migration has ever existed — no schema change requiring rollback has occurred yet, so there is no rollback-safety scenario to evaluate."},
+    {"id": "change-safety.e", "dimension": "change-safety", "status": "risk", "scope": ["repo-wide deploy mechanism"], "confidence": "high", "finding_ids": ["f45"]},
+
+    {"id": "security-boundaries.a", "dimension": "security-boundaries", "status": "strength", "scope": ["DeliveryResource"], "confidence": "high", "finding_ids": ["f46"]},
+    {"id": "security-boundaries.b", "dimension": "security-boundaries", "status": "clean", "scope": ["webhookrelay.auth-credential"], "confidence": "high", "evidence": [{"file": "examples/externally-deployed-config/src/main/resources/application.properties", "line": 2, "note": "webhookrelay.auth-credential=${AUTH_CREDENTIAL} — env-sourced, no checked-in default value"}]},
+    {"id": "security-boundaries.c", "dimension": "security-boundaries", "status": "clean", "scope": ["repo-wide log statements"], "confidence": "medium", "evidence": [{"note": "no logging exists anywhere in this repo (see f33/f34), so there is no incidental sensitive-data-in-logs exposure; payload content/schema is opaque and not defined in this repo, which limits how confidently 'sensitive data' can be ruled in or out of it", "file": "examples/externally-deployed-config/sql/001-deliveries.sql", "line": 5}]},
+    {"id": "security-boundaries.d", "dimension": "security-boundaries", "status": "risk", "scope": ["DeliverySender target_url handling"], "confidence": "medium", "finding_ids": ["f47"]},
+    {"id": "security-boundaries.e", "dimension": "security-boundaries", "status": "not-applicable", "scope": ["repo-wide"], "reason": "No destructive/privileged operation (delete, bulk update, admin action) exists anywhere in this repo — the only endpoint is a single read-only GET."}
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "prefix": "com.example.webhookrelay",
+  "nodes": [
+    { "id": "com.example.webhookrelay.client", "class_count": 1 },
+    { "id": "com.example.webhookrelay.consumer", "class_count": 1 },
+    { "id": "com.example.webhookrelay.entity", "class_count": 1 },
+    { "id": "com.example.webhookrelay.repository", "class_count": 1 },
+    { "id": "com.example.webhookrelay.resource", "class_count": 1 },
+    { "id": "com.example.webhookrelay.scheduler", "class_count": 1 },
+    { "id": "com.example.webhookrelay.security", "class_count": 1 },
+    { "id": "com.example.webhookrelay.service", "class_count": 1 }
+  ],
+  "edges": [
+    {
+      "from": "com.example.webhookrelay.consumer",
+      "to": "com.example.webhookrelay.client",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java",
+          "line": 3,
+          "imported_class": "com.example.webhookrelay.client.SubscriptionRegistryClient"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.consumer",
+      "to": "com.example.webhookrelay.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java",
+          "line": 4,
+          "imported_class": "com.example.webhookrelay.entity.WebhookDelivery"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.consumer",
+      "to": "com.example.webhookrelay.repository",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/consumer/DomainEventConsumer.java",
+          "line": 5,
+          "imported_class": "com.example.webhookrelay.repository.WebhookDeliveryRepository"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.repository",
+      "to": "com.example.webhookrelay.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/repository/WebhookDeliveryRepository.java",
+          "line": 3,
+          "imported_class": "com.example.webhookrelay.entity.WebhookDelivery"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.resource",
+      "to": "com.example.webhookrelay.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/resource/DeliveryResource.java",
+          "line": 3,
+          "imported_class": "com.example.webhookrelay.entity.WebhookDelivery"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.resource",
+      "to": "com.example.webhookrelay.repository",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/resource/DeliveryResource.java",
+          "line": 4,
+          "imported_class": "com.example.webhookrelay.repository.WebhookDeliveryRepository"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.scheduler",
+      "to": "com.example.webhookrelay.entity",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java",
+          "line": 3,
+          "imported_class": "com.example.webhookrelay.entity.WebhookDelivery"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.scheduler",
+      "to": "com.example.webhookrelay.repository",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java",
+          "line": 4,
+          "imported_class": "com.example.webhookrelay.repository.WebhookDeliveryRepository"
+        }
+      ]
+    },
+    {
+      "from": "com.example.webhookrelay.scheduler",
+      "to": "com.example.webhookrelay.service",
+      "weight": 1,
+      "examples": [
+        {
+          "file": "examples/externally-deployed-config/src/main/java/com/example/webhookrelay/scheduler/DeliveryRetryJob.java",
+          "line": 5,
+          "imported_class": "com.example.webhookrelay.service.DeliverySender"
+        }
+      ]
+    }
+  ]
+}
