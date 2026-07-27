@@ -257,6 +257,42 @@ otherwise-honest doc being wrong about one specific claim is exactly the scenari
 should be able to catch, so it was left in place as a genuine (if originally unintentional) test of
 that.
 
+## Scheduled-job coverage test: `examples/batch-reconciliation`
+
+Every prior fixture classified `production-service`, `library`, or `cli-tool` — zero coverage on
+`batch-job`, despite `rubric_manifest.json`'s `system_type_overrides` giving it an **empty**
+override set (`{}`), the same strictness as `production-service`.
+[`examples/batch-reconciliation`](../examples/batch-reconciliation) tests the failure mode that
+matters for `batch-job` specifically: not suppression, but *misclassification* — a nightly
+CronJob with no HTTP listener and no interactive entry point superficially resembles a `cli-tool`
+(which *does* suppress `scale-requirements`/`observability`/`scalability`/`reliability-resilience`/
+`change-safety`), and getting that call wrong would silently drop a real, serious finding: the
+job's `AdjustmentWriter` has no idempotency guard, so a rerun after a partial failure (the exact
+retry model `reliability-resilience.a`'s own checklist text names — "scheduled jobs") double-applies
+corrections to a financial ledger. See
+[`examples/batch-reconciliation.expected.md`](../examples/batch-reconciliation.expected.md) for the
+full pass bar and actual first-run result.
+
+One cold run (fresh agent, no memory), `full` mode: `system_type` classified `batch-job`, confidence
+**high** — correctly reasoned from `deploy/cronjob.yaml`'s `schedule`/`concurrencyPolicy: Forbid`/
+`backoffLimit: 0`, the README's explicit "not run interactively... no HTTP endpoint, no long-running
+process" framing, and `ReconciliationJob.main`'s single-pass-then-exit shape, rather than defaulting
+to `cli-tool` off the absence of a server. `validate_findings.py`: `OK (34 findings, 37 checks, 0
+warnings)`, 37/37 mandatory checks covered (100% — `batch-job`'s override set being empty means
+every dimension stayed mandatory), debt index 10/100 (Critical).
+
+No rubric-wording gap surfaced this run. The one real defect was in this repo's own hand-written
+expected-outcome table: 8 checks (`reliability-resilience.b`/`.c`, `change-safety.b`/`.c`/`.e`,
+`extensibility.b`, `security-boundaries.d`/`.e`) were predicted `not-applicable`/`clean` but the
+cold run found real, evidence-backed findings for each — unconfigured DB connection timeouts, a
+write-failure silently miscounted as a success in the job's own summary, no migration convention
+anywhere in the repo, a forward-compatible explicit-column `SELECT` (a strength), no gradual-rollout
+path for a financially-risky job, `LedgerClient`/`AdjustmentWriter` independently reimplementing
+near-identical connection boilerplate, and no anomaly/magnitude gate before an auto-applied
+correction hits `ledger-mirror`. All were independently verified against `findings.json`'s raw
+evidence (not taken from the agent's self-report) before correcting the table in place, per this
+repo's own "trust real evidence over the table" rule.
+
 ## Known limitations, disclosed rather than hidden
 
 **Phrasing rule recurrence:** a phrasing rule exists (state findings as direct facts, not as an

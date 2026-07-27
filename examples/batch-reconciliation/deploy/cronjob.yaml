@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ledger-reconciliation-job
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: reconciliation
+              image: internal-registry/ledger-reconciliation-job:latest
+              env:
+                - name: LEDGER_PRIMARY_URL
+                  value: "jdbc:postgresql://ledger-primary.internal:5432/ledger"
+                - name: LEDGER_MIRROR_URL
+                  value: "jdbc:postgresql://ledger-mirror.internal:5432/ledger"
+                - name: LEDGER_DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ledger-db-credentials
+                      key: password
