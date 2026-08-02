@@ -57,9 +57,11 @@ An explicit `--mode` argument always overrides inference.
 ## 1. Locate the docs (`reconcile`/`full`)
 
 See `references/reconciliation.md` for the full technique. In short: find every `docs/` folder
-repo-wide by default (`find . -type d -iname docs ...`), read every `.md` plus Mermaid/image
-diagrams under each, and honor a user-named narrower doc scope without silently expanding it
-(that restriction applies to reconciliation sources only — it doesn't limit step 5).
+repo-wide by default (`find . -type d -iname docs ...`), read every `.md` in it, **and separately
+enumerate `.mmd`/`.png`/`.svg`/`.excalidraw` diagram files with their own `find`** — don't rely on
+noticing them while reading prose docs — reading `.mmd` files as claim sources just like `.md`.
+Honor a user-named narrower doc scope without silently expanding it (that restriction applies to
+reconciliation sources only — it doesn't limit step 5).
 
 ## 1.5. Establish system context (`evaluate`/`full`)
 

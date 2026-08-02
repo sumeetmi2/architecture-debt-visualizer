@@ -14,12 +14,25 @@ find . -type d -iname docs -not -path "*/node_modules/*" -not -path "*/build/*" 
 ```
 
 Read every `.md` file recursively under each discovered `docs/` folder, plus `README.md` at repo
-root and any `*/README*.md` one level down. **Also read non-Markdown diagram sources in those
-folders** — `.mmd` (Mermaid) files diff and grep cleanly, so treat them as first-class claim
-sources; render/view any `.png`/`.svg`/`.excalidraw` diagrams too (the Read tool handles images
+root and any `*/README*.md` one level down.
+
+**Also enumerate and read diagram sources in those same folders — don't rely on stumbling onto
+them while reading docs, actively list them:**
+
+```
+find . -type d \( -iname docs -o -iname diagrams \) -not -path "*/node_modules/*" \
+  -not -path "*/build/*" -not -path "*/.git/*" \
+  -exec find {} -type f \( -iname "*.mmd" -o -iname "*.png" -o -iname "*.svg" -o -iname "*.excalidraw" \) \;
+```
+
+Treat every `.mmd` (Mermaid) file this turns up as a first-class claim source — it diffs and greps
+cleanly, so read it and extract claims exactly as you would from a `.md` file, don't just note its
+existence. Render/view any `.png`/`.svg`/`.excalidraw` diagrams too (the Read tool handles images
 directly). If a doc states which artifact is the source of truth when diagrams disagree (Mermaid
 vs. a frozen PNG export, for instance), trust that doc's stated policy — but still check the two
-actually agree, because "we said the PNG shouldn't go stale" is not the same as "it hasn't."
+actually agree, because "we said the PNG shouldn't go stale" is not the same as "it hasn't." A repo
+with zero diagram files found by the command above is a legitimate outcome, not a signal to skip
+the step — just proceed with the `.md` claims.
 
 If the user names specific doc file(s) or a narrower path, use those instead — don't silently
 expand scope in that case. Note that this restriction applies to which docs are treated as
