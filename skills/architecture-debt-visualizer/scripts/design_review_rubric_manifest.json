@@ -1,0 +1,175 @@
+{
+  "_purpose": "Checklist manifest for design-review mode, parallel in spirit to rubric_manifest.json but for evaluating a NEW FEATURE PROPOSAL against a target system, not auditing an existing repo's debt. Every check here is mandatory on every design-review run — a proposal that hasn't addressed a dimension yet doesn't excuse skipping the check, it means the check's answer is 'open-question' or 'risk (missing)', recorded honestly rather than omitted. There is deliberately no system_type_overrides table: unlike the debt-audit manifest, applicability here doesn't vary by what kind of repo the target is, it varies by what the proposal actually touches — and that's a per-instance judgment (not-applicable status on a specific check instance), not a manifest-level exemption.",
+  "dimensions": {
+    "architecture-fit": {
+      "label": "Architecture Fit",
+      "checks": [
+        {
+          "id": "architecture-fit.a",
+          "letter": "a",
+          "summary": "Does the proposal respect the target repo's existing module/service boundaries, or does it reach across a boundary the codebase otherwise keeps closed? Cite the specific existing boundary (package structure, API gateway, ownership doc) being crossed or respected."
+        },
+        {
+          "id": "architecture-fit.b",
+          "letter": "b",
+          "summary": "Does this duplicate a capability that already exists in the target system(s) under a different name? Grep for existing components with overlapping responsibility before assuming this is net-new."
+        }
+      ]
+    },
+    "data-impact": {
+      "label": "Data Impact",
+      "checks": [
+        {
+          "id": "data-impact.a",
+          "letter": "a",
+          "summary": "Every new/changed persisted field, table, or event schema: is there a migration plan for existing data, and is backward compatibility for in-flight readers/writers addressed?"
+        },
+        {
+          "id": "data-impact.b",
+          "letter": "b",
+          "summary": "Data ownership: does the proposal introduce a new source of truth for data another system already owns, or duplicate/fork state that should stay canonical in one place?"
+        }
+      ]
+    },
+    "scalability-impact": {
+      "label": "Scalability Impact",
+      "checks": [
+        {
+          "id": "scalability-impact.a",
+          "letter": "a",
+          "summary": "Does the proposal state an expected load/scale (QPS, data volume, growth rate), and does the target system's current architecture (from the deterministic signals + reading) actually support it? Flag hardcoded capacity assumptions the proposal is silent on."
+        }
+      ]
+    },
+    "security-and-compliance": {
+      "label": "Security & Compliance",
+      "checks": [
+        {
+          "id": "security-and-compliance.a",
+          "letter": "a",
+          "summary": "New/changed surface (endpoint, queue topic, UI action): is authN/authZ addressed, and does it match the target system's existing security boundary pattern rather than inventing a new one?"
+        },
+        {
+          "id": "security-and-compliance.b",
+          "letter": "b",
+          "summary": "Does the proposal touch data with sensitivity implications (PII, financial, regulated) without naming the applicable compliance requirement or data-handling constraint?"
+        }
+      ]
+    },
+    "operability": {
+      "label": "Operability",
+      "checks": [
+        {
+          "id": "operability.a",
+          "letter": "a",
+          "summary": "Observability plan: does the proposal name what will be logged/metered/traced/alerted on for the new surface, and who owns responding to it?"
+        },
+        {
+          "id": "operability.b",
+          "letter": "b",
+          "summary": "Failure modes: does the proposal describe what happens when a dependency it introduces is slow/unavailable, and is there a rollback or feature-flag path if the rollout goes wrong?"
+        }
+      ]
+    },
+    "migration-and-compatibility": {
+      "label": "Migration & Compatibility",
+      "checks": [
+        {
+          "id": "migration-and-compatibility.a",
+          "letter": "a",
+          "summary": "Existing API/consumer compatibility: does this proposal break an existing contract (request/response shape, event schema, CLI flag) that another team or system depends on?"
+        },
+        {
+          "id": "migration-and-compatibility.b",
+          "letter": "b",
+          "summary": "If this spans multiple repos/systems, is the cross-repo sequencing/versioning explicit (which side deploys first, how is the in-between state handled)?"
+        }
+      ]
+    },
+    "cost": {
+      "label": "Cost",
+      "checks": [
+        {
+          "id": "cost.a",
+          "letter": "a",
+          "summary": "Does the proposal name the infra/operational cost implications (new service, storage growth, third-party API spend) of this change, proportionate to its actual scope?"
+        }
+      ]
+    },
+    "alternatives-and-tradeoffs": {
+      "label": "Alternatives & Tradeoffs",
+      "checks": [
+        {
+          "id": "alternatives-and-tradeoffs.a",
+          "letter": "a",
+          "summary": "Does the proposal name at least one alternative approach it considered and explain why it wasn't chosen, or does it present one option with no visible tradeoff analysis?"
+        }
+      ]
+    },
+    "testing-and-validation": {
+      "label": "Testing & Validation",
+      "checks": [
+        {
+          "id": "testing-and-validation.a",
+          "letter": "a",
+          "summary": "Does the proposal describe how correctness will be validated pre- and post-launch (test strategy, staged rollout, experiment/metric to watch)?"
+        }
+      ]
+    },
+    "objectives-and-prioritization": {
+      "label": "Objectives & Prioritization",
+      "checks": [
+        {
+          "id": "objectives-and-prioritization.a",
+          "letter": "a",
+          "summary": "Are the stated objectives and KPIs internally coherent (no ambiguous/contradictory targets), and does each objective have at least one KPI that would actually detect whether it succeeded?"
+        },
+        {
+          "id": "objectives-and-prioritization.b",
+          "letter": "b",
+          "summary": "For each objective, is there a traceable architecture/roadmap element responsible for delivering it, sized proportionately to how the proposal itself ranks that objective's importance? Flag objectives that are given top billing but the thinnest design/roadmap treatment, or KPIs with no architecture element that owns hitting them."
+        }
+      ]
+    },
+    "presentation-and-completeness": {
+      "label": "Presentation & Completeness",
+      "checks": [
+        {
+          "id": "presentation-and-completeness.a",
+          "letter": "a",
+          "summary": "Does the proposal have a coherent narrative flow (agenda/table-of-contents matches what's actually presented, section order builds logically, no duplicated/near-duplicate slides), and does each slide/section have a single clear takeaway rather than mixing several distinct ideas?"
+        },
+        {
+          "id": "presentation-and-completeness.b",
+          "letter": "b",
+          "summary": "Is information density/verbosity appropriate for the actual audience (a time-boxed senior review committee, not necessarily deep specialists in every named technology), and does implementation-level plumbing crowd out room for risk/tradeoff discussion rather than being pushed to an appendix?"
+        },
+        {
+          "id": "presentation-and-completeness.c",
+          "letter": "c",
+          "summary": "Presence/absence checklist against the standard sections a mature design proposal usually carries: deployment strategy, rollout/rollback plan, phased plan, testing strategy, observability/monitoring, ownership/on-call, security review, cost, alternatives, success metrics. This checks whether a section exists at all (signals the presenter thought about it) — the CONTENT quality within a present section is graded by the other dimensions, not here, so don't double-penalize the same gap twice."
+        },
+        {
+          "id": "presentation-and-completeness.d",
+          "letter": "d",
+          "summary": "Identify what the proposal's OWN content implies is its single most load-bearing design element or dependency — the thing that, if wrong or missing, breaks the core value proposition (often visible only from cross-referencing findings from other dimensions, e.g. a diagram dependency with no code/ticket backing it, per dependencies-and-integration.b). Then check whether the deck's narrative actually returns to it — in Objectives, Risks & Mitigation, and the Roadmap — proportionate to how much rests on it, or whether it appears once (often buried in a diagram with no accompanying text) while lower-stakes, better-understood, or purely internal implementation detail gets dedicated, even duplicated, slides. A proposal can be well-organized (passing check .a) and still tell an inverted story where its riskiest, most critical thread gets the least narrative weight."
+        }
+      ]
+    },
+    "dependencies-and-integration": {
+      "label": "Dependencies & Integration",
+      "checks": [
+        {
+          "id": "dependencies-and-integration.a",
+          "letter": "a",
+          "summary": "Are cross-team/cross-repo/cross-system dependencies this proposal relies on explicitly named, with any blocking sequencing called out (e.g. 'requires Team X's API to ship first')?"
+        },
+        {
+          "id": "dependencies-and-integration.b",
+          "letter": "b",
+          "summary": "For every cross-system guarantee/gate the proposal's diagram or text claims (\"system X won't proceed until Y is true\" — a readiness check, a validation gate, an enforced precondition), verify there's an actual enforcement point wired up on the CONSUMING side, not just a capability that exists on the providing side. A server endpoint nobody calls, or a diagram arrow with no corresponding integration ticket/code on the other end, delivers none of the guarantee the proposal claims — check the provider's own docs/tickets for named consumers and their status, and treat an unverifiable or unticketed consumer as a real gap, not an assumed detail. This is systems-thinking, not a single-repo check: think like a domain expert tracing how the systems on both sides of an integration actually depend on each other, not just what one side built."
+        }
+      ]
+    }
+  }
+}

@@ -1,10 +1,11 @@
 # architecture-debt-visualizer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Plugin version](https://img.shields.io/badge/plugin-2.0.0-blue.svg)](.claude-plugin/plugin.json)
+[![Plugin version](https://img.shields.io/badge/plugin-2.1.0-blue.svg)](.claude-plugin/plugin.json)
 
 An open-source Claude Code skill and plugin for architecture reviews, documentation-drift
-detection, and evidence-based technical-debt analysis.
+detection, evidence-based technical-debt analysis, and technical design reviews of new feature
+proposals.
 
 It compares your architecture docs against the real codebase, flags stale or incorrect design
 claims, and independently evaluates the architecture across 12 dimensions — scale requirements,
@@ -57,6 +58,38 @@ Currently ships one deterministic script for dependency-graph extraction that's 
 (`extract_dep_graph.py` parses `package`/`import` syntax); the report generator and churn analysis
 are language-agnostic. On a non-Java repo, the skill runs fine without the dependency graph.
 
+## Design review mode
+
+A separate, independent job from the above: reviewing a **new feature proposal** — a Confluence
+page, a Google Slides/Docs deck, a local `.pptx`/PDF, or pasted text — against the actual
+architecture of the system(s) it touches, instead of auditing a repo's own docs against its own
+code.
+
+> Can you review this design proposal against our codebase? \<link\>
+
+1. **Ingest the proposal** from whatever source it's in, including viewing architecture diagrams
+   as rendered images (not just extracted text) — diagram content is frequently invisible to plain
+   text extraction entirely, not just garbled.
+2. **Discover and clone any other repos the proposal names** (GitHub/Bitbucket URLs found in the
+   text) alongside the repo the skill was invoked in, so a proposal spanning multiple systems gets
+   judged against all of them, not just one.
+3. **Evaluate against a 12-dimension checklist** distinct from the debt-audit rubric above:
+   architecture fit, data impact, scalability impact, security & compliance, operability,
+   migration & compatibility, cost, alternatives & tradeoffs, testing & validation, dependencies &
+   integration, objectives & prioritization (does the design serve its own stated goals
+   proportionate to how it ranks them, not just pass each check individually), and presentation &
+   completeness (is the proposal itself well-structured — including whether its narrative gives its
+   own biggest risk proportionate attention, not just whether it's organized).
+4. **Produce a verdict** — `Recommend` / `Recommend With Changes` / `Needs More Information` / `Do
+   Not Recommend As-Is` — computed mechanically from findings, not talked up by strengths: any
+   `blocking` risk forces the strictest verdict, and only a proposal with no unresolved risk or
+   open question earns a plain `Recommend`.
+
+See [`skills/architecture-debt-visualizer/references/design-review.md`](skills/architecture-debt-visualizer/references/design-review.md)
+for the full procedure and findings schema. This mode is newer than the debt-audit mode above and
+hasn't been through the same cold-agent validation history yet — see
+[`docs/validation.md`](docs/validation.md#known-limitations-disclosed-rather-than-hidden).
+
 ## Install
 
 ```
@@ -70,7 +103,8 @@ In any repo, ask Claude Code something like:
 
 > Can you evaluate our architecture and check if the docs are still accurate?
 
-The skill triggers automatically on phrases like that, or invoke it explicitly. See
+The skill triggers automatically on phrases like that (or on a design-review request like the one
+above), or invoke it explicitly. See
 [`skills/architecture-debt-visualizer/SKILL.md`](skills/architecture-debt-visualizer/SKILL.md) for
 the full workflow, scoring methodology, and the specific investigation techniques it applies per
 dimension.
