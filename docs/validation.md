@@ -295,6 +295,20 @@ repo's own "trust real evidence over the table" rule.
 
 ## Known limitations, disclosed rather than hidden
 
+**`design-review` mode hasn't been through this project's cold-agent validation process yet.**
+Everything above this section describes `reconcile`/`evaluate`/`full` mode, which has the
+identical-scope cold-run history this file exists to document. `design-review` mode
+(`references/design-review.md`) was built and iterated against one real proposal review in a
+single working session — its rubric dimensions were sharpened by real friction found during that
+session (see the dimension-addition notes in `references/design-review.md` itself), but it hasn't
+yet had a second, independent cold-agent run to check for the kind of run-to-run variance this
+file measures for the older modes. Treat its output with the same evidence discipline as any other
+mode (every finding still requires cited evidence and passes `validate_design_review.py`), but
+don't assume its checklist coverage is as battle-tested yet. Contributions that cold-test it
+against a second proposal are especially welcome — see `CONTRIBUTING.md`.
+
+
+
 **Phrasing rule recurrence:** a phrasing rule exists (state findings as direct facts, not as an
 unresolved positive-sounding hypothesis with no marker — see
 [`references/evidence-standard.md`](../skills/architecture-debt-visualizer/references/evidence-standard.md))
