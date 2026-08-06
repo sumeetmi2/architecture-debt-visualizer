@@ -1,22 +1,26 @@
 ---
 name: architecture-debt-visualizer
-description: "Reconcile a repo's design docs against its actual code AND/OR evaluate the architecture itself like a senior/staff architect — scalability, extensibility, long-term maintainability, performance/operational cost, data/entity-model soundness, observability, and whether the implementation still serves the product's stated technical vision. Classifies the repo's system type first so requirements are judged against what it actually is, not assumed to be a production service. Produces a scored, filterable HTML report. Use when the user asks to check if docs are stale, find architecture drift, audit docs vs. code, evaluate technical architecture, review data model / entity design, assess scalability or tech debt, or run an 'architecture debt' / 'architecture review' report. Triggers on phrases like 'check if our docs are still accurate' (reconcile mode), 'evaluate our architecture' / 'is this scalable' / 'review the data model' (evaluate mode), 'run an architecture debt audit' (full mode), 'architecture debt visualizer'."
-argument-hint: "[path to docs folder, default: docs/] [--mode reconcile|evaluate|full, default: full]"
+description: "Reconcile a repo's design docs against its actual code AND/OR evaluate the architecture itself like a senior/staff architect — scalability, extensibility, long-term maintainability, performance/operational cost, data/entity-model soundness, observability, and whether the implementation still serves the product's stated technical vision. Classifies the repo's system type first so requirements are judged against what it actually is, not assumed to be a production service. Also runs technical design reviews on new feature proposals (a slide deck, Confluence page, Google Doc, or pasted text) — fetches/extracts the proposal, discovers and clones any other GitHub/Bitbucket repos it names, and evaluates the proposal against the target system(s)' actual architecture like a staff engineer running a design review. Produces a scored, filterable HTML report (or a verdict-led design-review report in that mode). Use when the user asks to check if docs are stale, find architecture drift, audit docs vs. code, evaluate technical architecture, review data model / entity design, assess scalability or tech debt, run an 'architecture debt' / 'architecture review' report, or review/evaluate a new feature proposal / design doc / RFC / slide deck. Triggers on phrases like 'check if our docs are still accurate' (reconcile mode), 'evaluate our architecture' / 'is this scalable' / 'review the data model' (evaluate mode), 'run an architecture debt audit' (full mode), 'review this design proposal' / 'evaluate this feature proposal' / 'technical design review of this RFC/deck/Confluence page' (design-review mode), 'architecture debt visualizer'."
+argument-hint: "[path to docs folder, default: docs/] [--mode reconcile|evaluate|full|design-review, default: full] [--proposal <path|url> for design-review mode]"
 ---
 
 # Architecture Debt Visualizer
 
-Two independent jobs:
+Three independent jobs:
 
 1. **Reconciliation** — does the code still do what the docs say it does? (textual accuracy)
 2. **Evaluation** — judging as a senior architect would, is the *architecture itself* sound, and
    does it still serve where the product is actually headed? (engineering judgment, classified
    against what kind of system this actually is — see step 1.5)
+3. **Design review** — judging as a staff engineer would, should a *new feature proposal* (slide
+   deck, Confluence page, Google Doc, RFC) be built as written against the system(s) it actually
+   touches? (see `references/design-review.md` — separate mode, separate schema, separate report)
 
 Job 1 catches drift. Job 2 catches debt that was never wrong on paper because no doc ever made a
-claim about it. **Act as an independent evaluator, not a transcription service** in job 2 — it
-does not wait for a doc claim to react to. A `confirmed` reconciliation result does not make a bad
-pattern acceptable; judge quality separately, on its own merits.
+claim about it. Job 3 catches proposal problems before they become code. **Act as an independent
+evaluator, not a transcription service** in jobs 2 and 3 — neither waits for a doc claim to react
+to. A `confirmed` reconciliation result does not make a bad pattern acceptable; judge quality
+separately, on its own merits.
 
 Full technique detail lives in `references/` — this file is the workflow skeleton and the
 non-negotiable rules. Read the referenced file at the point you reach that step; don't front-load
@@ -37,7 +41,10 @@ all of them.
    step 1.5.
 7. State limitations and confidence explicitly rather than implying more certainty than you have.
 8. `scripts/*.py` are deterministic helpers — run them, don't reimplement their logic by hand.
-9. Don't modify the audited repository.
+9. Don't modify the audited repository — including any secondary repo cloned for `design-review`
+   mode; those are read-only context, same as the primary repo.
+10. In `design-review` mode, never fabricate what an inaccessible secondary repo contains — an
+    unreachable clone narrows scope and gets recorded as a limitation, it never gets guessed at.
 
 ## 0. Resolve mode
 
@@ -51,8 +58,25 @@ all of them.
   default whenever intent is ambiguous or unstated**. Runs everything. Defaulting ambiguity to
   `full` preserves this skill's original always-both behavior rather than silently narrowing scope
   the user didn't ask to narrow.
+- **`design-review`** — proposal-evaluation questions ("review this design doc," "evaluate this
+  feature proposal," "technical design review of this deck/Confluence page/RFC"). Entirely separate
+  workflow, schema, and report — see `references/design-review.md` for the full procedure (steps
+  A-I there replace steps 1-9 below for this mode). Never inferred from an unstated mode the way
+  `full` is — a proposal-review request always names a proposal or a review verb, so ambiguity here
+  should prompt a clarifying question rather than silently guessing this mode.
 
 An explicit `--mode` argument always overrides inference.
+
+## 0.5. `design-review` mode — stop here and switch tracks
+
+If mode resolved to `design-review`, **do not run steps 1-9 below.** Go directly to
+`references/design-review.md` and follow its steps A-I instead: ingest the proposal, discover and
+clone any other repos it names, classify context per repo, extract the proposal's claims, run the
+design-review checklist (`scripts/design_review_rubric_manifest.json`), write findings, validate
+with `scripts/validate_design_review.py`, and render with
+`scripts/generate_design_review_report.py`. The non-negotiable rules above (evidence citation,
+DDL-not-prose, no fabricated claims, state limitations, run deterministic scripts, don't modify the
+audited repo(s)) still apply — only the workflow steps and schemas differ.
 
 ## 1. Locate the docs (`reconcile`/`full`)
 

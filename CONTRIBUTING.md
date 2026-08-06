@@ -5,14 +5,27 @@ real runs, and new fixtures are all useful contributions.
 
 ## Where things live
 
-- `skills/architecture-debt-visualizer/SKILL.md` — the workflow entry point.
+- `skills/architecture-debt-visualizer/SKILL.md` — the workflow entry point (debt-audit modes:
+  `reconcile`/`evaluate`/`full`, plus mode resolution that routes `design-review` mode out to its
+  own reference doc).
 - `skills/architecture-debt-visualizer/references/*.md` — the actual rubric prose (evidence
   standard, evaluation rubric, system classification, report schema). Most substantive
   contributions are edits here.
+- `skills/architecture-debt-visualizer/references/design-review.md` — the separate `design-review`
+  mode's full procedure (proposal ingestion, multi-repo discovery, its own 12-dimension rubric,
+  findings schema, verdict logic). Independent workflow from the debt-audit modes above; edits here
+  don't need to stay in sync with the other reference docs.
 - `skills/architecture-debt-visualizer/scripts/*.py` — deterministic, zero-third-party-dependency
-  helpers (`validate_findings.py`, `generate_report.py`, `extract_dep_graph.py`,
-  `analyze_churn.py`). If you change what a script enforces, update the reference doc it enforces
-  in the same PR — they're meant to stay in sync, not diverge into two sources of truth.
+  helpers. Debt-audit: `validate_findings.py`, `generate_report.py`, `extract_dep_graph.py`,
+  `compute_churn.py`. Design-review: `validate_design_review.py`,
+  `generate_design_review_report.py`, `discover_repos.py` (finds and clones repos a proposal
+  names), `extract_pptx_text.py` (stdlib-only slide text extraction). If you change what a script
+  enforces, update the reference doc it enforces in the same PR — they're meant to stay in sync,
+  not diverge into two sources of truth.
+- `skills/architecture-debt-visualizer/scripts/design_review_rubric_manifest.json` — the
+  design-review checklist, parallel to `rubric_manifest.json` but with no `system_type_overrides`
+  table (every check is mandatory on every design-review run; applicability varies by what the
+  *proposal* touches, not the target repo's type).
 - `examples/` — fixtures used to validate rubric changes (see below).
 - `docs/validation.md` — the methodology and every fixture's writeup.
 
