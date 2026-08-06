@@ -53,6 +53,53 @@ Optionally run in a narrower **mode** — `reconcile` (docs-accuracy only), `eva
 narrow request like "is `boundaries.md` stale?" doesn't pay for a full evaluation pass it didn't ask
 for.
 
+## Auto-patching findings — `/eval-architecture` and the patcher skill
+
+The plugin also ships a caller command, **`/eval-architecture`**, that runs the audit and (only
+when you ask) chains into a second skill, **`architecture-debt-patcher`**, which opens **one pull
+request per finding** at or above a risk threshold you choose.
+
+```
+# audit only, report goes to a local HTML file — no code changes
+/eval-architecture
+
+# audit, then open PRs for High + Critical findings only (the safe default)
+/eval-architecture --patch
+
+# audit, then open PRs for Medium and above
+/eval-architecture --patch --min-risk medium
+
+# skip the audit entirely — reuse a report you already generated
+/eval-architecture --from-report /tmp/adv-abc123
+/eval-architecture --from-report /tmp/adv-abc123 --min-risk medium
+```
+
+
+Design intent:
+
+- **The patcher never runs unless you pass `--patch` or `--from-report`.** Running the audit
+  alone is always safe: no branches, no commits, no PRs.
+- **`--from-report <path>` skips the audit entirely** and patches straight from an existing run
+  directory (any prior `mktemp` path the audit skill wrote to). It implies `--patch`, and warns
+  if the report is older than the repo's latest commit. Useful when you already have a report
+  from earlier in the session (or from a saved location) and don't want to pay to regenerate it
+  just to act on it.
+- **If you pass `--patch` (or `--from-report`) without `--min-risk`, the default is `high`.**
+  That means only High and Critical findings get PRs — a conservative floor for anything the user
+  didn't explicitly opt in to. `info` findings are never eligible regardless of threshold.
+
+- **One PR per finding, one branch per finding, one commit per PR.** PRs are never batched, so
+  each one carries the full evidence and recommendation from its finding and can be reviewed or
+  reverted independently.
+- **The patcher skips rather than guesses.** Vague recommendations, multi-file refactors, and
+  anything requiring design judgment are reported back with a structured skip reason instead of
+  turning into a bad PR. See the [patcher skill](skills/architecture-debt-patcher/SKILL.md) for
+  the full skip-reason vocabulary and the exact PR body format.
+
+You can also invoke the patcher directly (e.g. "apply the high-risk fixes from that report") — it
+just needs the audit skill's run directory as input.
+
+
 Currently ships one deterministic script for dependency-graph extraction that's Java/Gradle-specific
 (`extract_dep_graph.py` parses `package`/`import` syntax); the report generator and churn analysis
 are language-agnostic. On a non-Java repo, the skill runs fine without the dependency graph.
