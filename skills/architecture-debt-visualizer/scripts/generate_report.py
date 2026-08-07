@@ -46,7 +46,7 @@ The report has four headline indicators (Documentation fidelity, Architecture ri
 coverage, Evidence confidence — see INDICATOR PHILOSOPHY below) plus a legacy 0-100 Debt index
 kept as a secondary figure, a static-analysis panel, a check-coverage panel (when --checks is
 supplied), and the findings themselves (a curated "key findings" shortlist plus the full
-filterable table).
+filterable, severity-grouped card list).
 
 No third-party dependencies: pure stdlib, single output file (inline CSS/JS).
 """
@@ -99,15 +99,10 @@ SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1, "info": 0}
 # Known limitations, stated plainly: (1) more thorough scrutiny surfaces more findings, so two runs
 # at different depth aren't comparable — this score is for tracking one repo's trend over time as
 # findings get fixed, not for ranking repos against each other. (2) findings aren't independent —
-# several may share one root cause (see f38/f39/f40 in this report) and get penalized separately.
-# (3) it can't weigh business impact or likelihood, only severity as judged during this review.
+# several may share one root cause and get penalized separately. (3) it can't weigh business impact
+# or likelihood, only severity as judged during this review.
 # Treat it as "how much unresolved, evidenced concern did this review surface," not a grade.
-# Per-dimension penalty is capped (DIMENSION_PENALTY_CAP) before summing across dimensions: measured
-# run-to-run variance showed one dimension happening to be unusually issue-rich (e.g. 5 high-severity
-# data-architecture findings on one run vs. 2 on an equally-thorough run) swinging the headline score
-# by 15-20+ points on its own — the cap bounds how much any single dimension can move the number,
-# so score differences track genuine breadth-of-concern rather than which dimension got lucky/unlucky
-# in what it happened to turn up.
+# Per-dimension penalty is capped (DIMENSION_PENALTY_CAP) before summing across dimensions.
 SCORE_WEIGHTS = {"high": 6, "medium": 3, "low": 1, "info": 0}
 DIMENSION_PENALTY_CAP = 15
 STRENGTH_BONUS_PER = 1
@@ -121,25 +116,6 @@ SCORE_BANDS = [
 ]
 RISK_BANDS = [(80, "Low"), (55, "Medium"), (30, "High"), (0, "Critical")]
 
-# --- INDICATOR PHILOSOPHY ---
-# A single 0-100 score conflates "are the docs accurate" with "is the architecture good" — a repo
-# can improve one and regress the other and one number can't say which. Four indicators separate
-# these concerns instead of blending them; the legacy Debt index (compute_score, unchanged) is
-# kept as a fifth, explicitly secondary figure so scores already published against this skill
-# (before this schema existed) stay comparable, not invalidated.
-#   Documentation fidelity — reconciliation pass only (confirmed / misaligned / gap). "Not run" if
-#     the report has no reconciliation findings at all (evaluate-mode run).
-#   Architecture risk — evaluation pass only (dimension != correctness), same capped weighted-
-#     penalty mechanics as the legacy score, banded to Low/Medium/High/Critical. "Not run" if the
-#     report has no evaluation-pass findings (reconcile-mode run).
-#   Audit coverage — checks.json entries with a non-"not-assessed" status, divided by how many
-#     checks scripts/rubric_manifest.json marks mandatory for this repo's classified system_type
-#     (context.json). "Not run" without both --checks and --context supplied — never a fabricated
-#     0%, since a missing input isn't the same claim as "zero checks were covered."
-#   Evidence confidence — % of findings carrying confidence:"high", among findings that state a
-#     confidence at all. "Not specified" if no finding in the report states one (true for every
-#     report generated before this field existed).
-
 
 def load(path):
     if not path:
@@ -149,7 +125,13 @@ def load(path):
 
 
 def load_manifest():
-    manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rubric_manifest.json")
+    manifest_path = os.path.join(
+        os.path.dirname(os.path.abspath(
+            "/Users/sumeetsharma/.claude/plugins/marketplaces/architecture-debt-visualizer/"
+            "skills/architecture-debt-visualizer/scripts/generate_report.py"
+        )),
+        "rubric_manifest.json",
+    )
     try:
         with open(manifest_path) as fh:
             return json.load(fh)
@@ -169,9 +151,7 @@ def is_strength(f):
     """A finding counts as a strength if it's explicitly classified that way (standalone,
     no doc claim), OR tagged finding_type="architecture-strength" even when classification
     is "confirmed" (it reconciles against a real doc claim *and* is worth crediting as sound
-    design — e.g. a decision log's bet that's still paying off). Without the finding_type
-    check, confirmed-but-noteworthy findings are invisible to the Strengths stat/filter/bonus
-    even though the table visibly tags them "architecture-strength", which reads as a bug."""
+    design)."""
     return f.get("classification") == "strength" or f.get("finding_type") == "architecture-strength"
 
 
@@ -224,8 +204,6 @@ def compute_audit_coverage(checks_doc, context_doc, manifest):
             mandatory_ids.add(chk["id"])
     if not mandatory_ids:
         return None
-    # A check id may have multiple scoped instances (see report-schema.md's "Scoped check
-    # instances") — an id is covered if ANY of its instances has a real status, not just its last.
     statuses_by_id = {}
     for c in checks_doc.get("checks", []):
         statuses_by_id.setdefault(c.get("id"), []).append(c.get("status"))
@@ -244,84 +222,151 @@ def compute_evidence_confidence(findings):
     return round(100 * high / len(rated)), len(rated)
 
 
-def _indicator_block(label, value_html, detail_html, tone_class=""):
+# ------------------------------------------------------------------------------------------------
+# NEW-LAYOUT template builders (ported from examples/minimal-cli-tool/report-v2skill.html)
+# ------------------------------------------------------------------------------------------------
+
+def build_meta_row(findings, dep_graph, checks_doc, context_doc, manifest):
+    total_classes = "—"
+    if dep_graph:
+        nodes = dep_graph.get("nodes", [])
+        total_classes = sum(n.get("class_count", 0) for n in nodes)
+
+    coverage = compute_audit_coverage(checks_doc, context_doc, manifest)
+    checks_run = f"{coverage[1]} / {coverage[2]}" if coverage else "—"
+    system_type = s(context_doc or {}, "system_type", "—")
+
+    items = [
+        (str(total_classes), "Classes analyzed"),
+        (checks_run, "Mandatory checks run"),
+        (str(len(findings)), "Scoped findings"),
+        (html.escape(system_type), "System type"),
+    ]
+    return "".join(
+        f'<div class="meta-item"><div class="meta-value">{v}</div><div class="meta-label">{html.escape(l)}</div></div>'
+        for v, l in items
+    )
+
+
+def build_score_card(findings):
+    score, label, penalty, bonus = compute_score(findings)
     return f"""
-      <div class="indicator {tone_class}">
-        <div class="indicator-value">{value_html}</div>
-        <div class="indicator-label">{html.escape(label)}</div>
-        <div class="indicator-detail muted">{detail_html}</div>
-      </div>
-    """
+<div class="score-card">
+  <div class="score-left">
+    <div class="eyebrow">Debt index (secondary)</div>
+    <div class="score-number">{score}</div>
+    <div class="score-caption">-{penalty} debt penalty, +{bonus} strength credit — {html.escape(label)}</div>
+  </div>
+  <div class="score-right">
+    <b>The four indicators below separate two different questions</b> this skill used to blend into
+    one number: whether the docs are accurate (Documentation fidelity) is a different axis from
+    whether the architecture is sound (Architecture risk) — a repo can improve one and regress the
+    other. Audit coverage says how much of the mandatory checklist actually got run; Evidence
+    confidence says how much of what's reported rests on direct citation versus inference.
+    <details class="score-philosophy">
+      <summary>Read before treating any of this as a grade</summary>
+      <p>Only <b>risk</b>, <b>misaligned</b>, and <b>gap</b> findings count against the debt index,
+      weighted by severity (high=6, medium=3, low=1, info=0) and summed per dimension, each
+      dimension capped at 15, before those capped totals are added together; <b>strength</b>
+      findings give a small capped bonus (+1 each, max +5). Deeper review surfaces more findings,
+      so it isn't comparable across repos or across runs at different scope/depth — use it to
+      track one repo's trend, not to rank systems against each other. Findings aren't independent
+      (several may share one root cause and still get penalized separately). It reflects severity
+      as judged during this review, not business impact or likelihood.</p>
+    </details>
+  </div>
+</div>
+"""
 
 
-def build_indicators(findings, checks_doc, context_doc, manifest):
+def build_indicators_grid(findings, checks_doc, context_doc, manifest):
     doc_fidelity = compute_doc_fidelity(findings)
     arch_risk = compute_architecture_risk(findings)
     coverage = compute_audit_coverage(checks_doc, context_doc, manifest)
     confidence = compute_evidence_confidence(findings)
-    score, label, penalty, bonus = compute_score(findings)
 
     blocks = [
-        _indicator_block(
+        (
             "Documentation fidelity",
             f"{doc_fidelity[0]}%" if doc_fidelity else "—",
             f"{doc_fidelity[1]} reconciliation findings" if doc_fidelity else "Not run in this mode",
         ),
-        _indicator_block(
+        (
             "Architecture risk",
             html.escape(arch_risk[0]) if arch_risk else "—",
             f"risk index {arch_risk[1]}/100" if arch_risk else "Not run in this mode",
         ),
-        _indicator_block(
+        (
             "Audit coverage",
             f"{coverage[0]}%" if coverage else "—",
             f"{coverage[1]}/{coverage[2]} mandatory checks" if coverage else "checks.json/context.json not supplied",
         ),
-        _indicator_block(
+        (
             "Evidence confidence",
             f"{confidence[0]}%" if confidence else "—",
             f"high-confidence, of {confidence[1]} rated" if confidence else "Not specified on these findings",
         ),
     ]
+    return "".join(
+        f'<div class="indicator"><div class="indicator-value">{v}</div>'
+        f'<div class="indicator-label">{html.escape(l)}</div>'
+        f'<div class="indicator-detail">{d}</div></div>'
+        for l, v, d in blocks
+    )
 
-    return f"""
-    <div class="indicator-bar">
-      {"".join(blocks)}
-    </div>
-    <div class="score-card">
-      <div class="score-number">{score}<span class="score-max">/100</span></div>
-      <div class="score-label">Debt index (secondary) — {html.escape(label)}</div>
-      <div class="score-math muted">-{penalty} debt penalty, +{bonus} strength credit</div>
-      <details class="score-philosophy">
-        <summary>Indicator &amp; score philosophy — read before treating any of this as a grade</summary>
-        <p><b>The four indicators above separate two different questions</b> this skill used to
-        blend into one number: whether the <i>docs</i> are accurate (Documentation fidelity) is a
-        different axis from whether the <i>architecture</i> is sound (Architecture risk) — a repo
-        can improve one and regress the other. Audit coverage says how much of the mandatory
-        checklist actually got run (not how many problems were found); Evidence confidence says how
-        much of what's reported rests on direct citation versus inference. A dash (—) means that
-        indicator legitimately wasn't computed for this run (wrong mode, or an older report
-        predating that field) — never a fabricated zero.</p>
-        <p><b>Debt index</b> (secondary, 0-100) is the original heuristic, debt-weighted signal,
-        kept for continuity with earlier reports. Only <b>risk</b>, <b>misaligned</b>, and
-        <b>gap</b> findings count against it, weighted by severity (high=6, medium=3, low=1,
-        info=0) and summed per dimension, each dimension capped at 15, before those capped totals
-        are added together; <b>strength</b> findings give a small capped bonus (+1 each, max +5).
-        Deeper review surfaces more findings, so it isn't comparable across repos or across runs at
-        different scope/depth — use it to track one repo's trend, not to rank systems against each
-        other. Findings aren't independent (several may share one root cause and still get
-        penalized separately). It reflects severity as judged during this review, not business
-        impact or likelihood.</p>
-      </details>
-    </div>
-    """
+
+def build_stat_cards(counts):
+    order = [
+        ("risk", "Risks"),
+        ("strength", "Strengths"),
+        ("confirmed", "Confirmed"),
+        ("gap", "Gaps"),
+        ("misaligned", "Misaligned"),
+    ]
+    return "".join(
+        f'<div class="stat-card {k}" data-filter-cls="{k}"><div class="num">{counts.get(k, 0)}</div>'
+        f'<div class="label">{html.escape(lbl)}</div></div>'
+        for k, lbl in order
+    )
+
+
+def build_sev_card(findings):
+    """Judgment call: the mockup's per-severity `.desc` text (e.g. "Extensibility-requirements and
+    extensibility gaps around undocumented growth priorities") reads as hand-written narrative
+    summarizing the findings at that severity. There's no such narrative field in findings.json, so
+    this generates a short programmatic summary instead — counts by classification at that
+    severity, or an explicit "none found" message when empty."""
+    sev_order = ["high", "medium", "low", "info"]
+    counts = {sv: 0 for sv in sev_order}
+    by_cls = {sv: {} for sv in sev_order}
+    for f in findings:
+        sev = s(f, "severity", "info")
+        if sev not in counts:
+            continue
+        counts[sev] += 1
+        cls = s(f, "classification", "confirmed")
+        by_cls[sev][cls] = by_cls[sev].get(cls, 0) + 1
+
+    def desc(sev):
+        if counts[sev] == 0:
+            return f"No {SEVERITY_LABEL[sev].lower()}-severity findings."
+        parts = [
+            f"{v} {CLASS_LABEL.get(k, k).lower()}"
+            for k, v in sorted(by_cls[sev].items(), key=lambda kv: -kv[1])
+        ]
+        return ", ".join(parts) + "."
+
+    return "".join(
+        f'<div class="sev-col {sv}" data-filter-sev="{sv}"><div class="num">{counts[sv]}</div>'
+        f'<div class="label">{SEVERITY_LABEL[sv]}</div>'
+        f'<div class="desc">{html.escape(desc(sv))}</div></div>'
+        for sv in sev_order
+    )
 
 
 def build_check_coverage(checks_doc, context_doc, manifest):
     if not checks_doc or not manifest:
         return None
-    # A check id may have multiple scoped instances (see report-schema.md's "Scoped check
-    # instances") — group them so the status breakdown reflects every instance, not just one.
     instances_by_id = {}
     for c in checks_doc.get("checks", []):
         instances_by_id.setdefault(c.get("id"), []).append(c)
@@ -442,7 +487,7 @@ def build_key_findings(findings):
     pressing = pressing[:8]
 
     if not pressing:
-        return "<p class='muted'>No high/medium-severity risks, gaps, or misalignments found.</p>"
+        return "<p class='empty-note'>No high/medium-severity risks, gaps, or misalignments found.</p>"
 
     items = []
     for f in pressing:
@@ -460,47 +505,105 @@ def build_key_findings(findings):
     return f'<ul class="key-findings-list">{"".join(items)}</ul>'
 
 
-def build_findings_table(findings):
-    rows = []
+def build_finding_card(f, num):
+    cls = s(f, "classification", "gap")
+    dim = s(f, "dimension", "correctness")
+    severity = s(f, "severity", "info")
+
+    evidence_html = "<br>".join(
+        f'{html.escape(s(ev, "file"))}'
+        + (f':{ev["line"]}' if ev.get("line") else "")
+        + (f' — {html.escape(s(ev, "note"))}' if ev.get("note") else "")
+        for ev in (f.get("evidence") or [])
+    )
+    evidence_block = f'<div class="evidence">{evidence_html}</div>' if evidence_html else ""
+
+    recommendation = s(f, "recommendation")
+    rec_html = f'<div class="recommendation"><b>Recommendation:</b> {html.escape(recommendation)}</div>' if recommendation else ""
+
+    meta_bits = []
+    finding_type = s(f, "finding_type")
+    if finding_type:
+        meta_bits.append(f'<span class="meta-tag">{html.escape(finding_type)}</span>')
+    for area in (f.get("impact_area") or []):
+        meta_bits.append(f'<span class="meta-tag meta-tag-impact">{html.escape(area)}</span>')
+    confidence = s(f, "confidence")
+    if confidence:
+        meta_bits.append(f'<span class="meta-tag meta-tag-confidence">confidence: {html.escape(confidence)}</span>')
+    meta_html = f'<div class="meta-tags">{"".join(meta_bits)}</div>' if meta_bits else ""
+
+    doc_source = s(f, "doc_source")
+    source_html = ""
+    if doc_source:
+        loc = s(f, "doc_location")
+        loc_html = f'<span class="muted"> — {html.escape(loc)}</span>' if loc else ""
+        source_html = f'<div class="source-line">{html.escape(doc_source)}{loc_html}</div>'
+
+    strength_attr = ' data-strength="true"' if is_strength(f) else ""
+
+    return f"""
+  <div class="finding" id="row-{html.escape(f['id'])}" data-sev="{severity}" data-cls="{cls}" data-dim="{dim}"{strength_attr}>
+    <div class="finding-num">{num:02d}</div>
+    <div class="finding-body">
+      <div class="finding-tags"><span class="badge badge-{cls}">{CLASS_LABEL.get(cls, cls)}</span><span class="dim-tag">{DIMENSION_LABEL.get(dim, dim)} · {SEVERITY_LABEL.get(severity, severity)}</span></div>
+      <div class="finding-claim">{html.escape(s(f, 'claim'))}</div>
+      <div class="explanation">{html.escape(s(f, 'explanation'))}</div>
+      {evidence_block}
+      {rec_html}
+      {meta_html}
+      {source_html}
+    </div>
+  </div>
+"""
+
+
+def build_findings_groups(findings):
+    """Judgment call: the mockup groups findings under semantic headings ("Low severity",
+    "Confirmed & strengths") rather than strictly "{Severity} severity" for all four buckets — the
+    mockup's info-severity group happened to be all confirmed/strength findings and was labeled
+    accordingly. This generalizes that: high/medium/low buckets get "{Severity} severity" headings;
+    the info bucket is labeled "Confirmed & strengths" (matching the mockup) since info-severity
+    findings are, by convention in this rubric, almost always confirmed/strength baseline findings.
+    Numbering is sequential across all groups, high -> medium -> low -> info, matching the mockup's
+    single running counter."""
+    sev_order = ["high", "medium", "low", "info"]
+    grouped = {sv: [] for sv in sev_order}
     for f in findings:
-        cls = s(f, "classification", "gap")
-        dim = s(f, "dimension", "correctness")
-        severity = s(f, "severity", "info")
-        evidence_html = "<br>".join(
-            f'{html.escape(s(ev, "file"))}'
-            + (f':{ev["line"]}' if ev.get("line") else "")
-            + (f' — {html.escape(s(ev, "note"))}' if ev.get("note") else "")
-            for ev in (f.get("evidence") or [])
-        )
-        recommendation = s(f, "recommendation")
-        rec_html = f'<div class="recommendation"><b>Recommendation:</b> {html.escape(recommendation)}</div>' if recommendation else ""
+        sev = s(f, "severity", "info")
+        grouped.setdefault(sev, []).append(f)
+    for sev in list(grouped.keys()):
+        if sev not in sev_order:
+            sev_order.append(sev)
 
-        meta_bits = []
-        finding_type = s(f, "finding_type")
-        if finding_type:
-            meta_bits.append(f'<span class="meta-tag">{html.escape(finding_type)}</span>')
-        for area in (f.get("impact_area") or []):
-            meta_bits.append(f'<span class="meta-tag meta-tag-impact">{html.escape(area)}</span>')
-        confidence = s(f, "confidence")
-        if confidence:
-            meta_bits.append(f'<span class="meta-tag meta-tag-confidence">confidence: {html.escape(confidence)}</span>')
-        meta_html = f'<div class="meta-tags">{"".join(meta_bits)}</div>' if meta_bits else ""
+    titles = {
+        "high": "High severity",
+        "medium": "Medium severity",
+        "low": "Low severity",
+        "info": "Confirmed & strengths",
+    }
 
-        strength_attr = ' data-strength="true"' if is_strength(f) else ""
-        rows.append(
-            f'<tr class="finding-row" id="row-{html.escape(f["id"])}" data-cls="{cls}" data-dim="{dim}" data-sev="{severity}"{strength_attr}>'
-            f'<td><span class="badge badge-{cls}">{CLASS_LABEL.get(cls, cls)}</span>'
-            f'<div class="dim-tag">{DIMENSION_LABEL.get(dim, dim)} · {SEVERITY_LABEL.get(severity, severity)}</div>'
-            f'{meta_html}</td>'
-            f'<td>{html.escape(s(f, "claim"))}'
-            f'<div class="explanation">{html.escape(s(f, "explanation"))}</div>'
-            f'{rec_html}</td>'
-            f'<td>{html.escape(s(f, "doc_source"))}'
-            f'<div class="muted">{html.escape(s(f, "doc_location"))}</div></td>'
-            f'<td class="evidence">{evidence_html}</td>'
-            f'</tr>'
-        )
-    return "\n".join(rows)
+    parts = []
+    counter = 0
+    for sev in sev_order:
+        items = grouped.get(sev) or []
+        if not items:
+            continue
+        cards = []
+        for f in items:
+            counter += 1
+            cards.append(build_finding_card(f, counter))
+        title = titles.get(sev, f"{SEVERITY_LABEL.get(sev, sev)} severity")
+        plural = "finding" if len(items) == 1 else "findings"
+        parts.append(f'<div class="sev-group-title">{html.escape(title)}</div>')
+        parts.append(f'<div class="sev-group-sub">{len(items)} {plural} — evidence shown inline</div>')
+        parts.extend(cards)
+    return "\n".join(parts)
+
+
+DIM_FILTER_BUTTONS = "".join(
+    f'<button data-filter-group="dim" data-filter="{dim}">{html.escape(label)}</button>'
+    for dim, label in DIMENSION_LABEL.items()
+)
 
 
 TEMPLATE = """<!doctype html>
@@ -509,99 +612,173 @@ TEMPLATE = """<!doctype html>
 <meta charset="utf-8">
 <title>{title}</title>
 <style>
-  :root {{ color-scheme: light dark; }}
+  :root {{ color-scheme: light; }}
+  * {{ box-sizing: border-box; }}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
-          background: #0f172a; color: #e2e8f0; }}
-  header {{ padding: 24px 32px; border-bottom: 1px solid #1e293b; }}
-  h1 {{ margin: 0 0 4px; font-size: 20px; }}
-  .subtitle {{ color: #94a3b8; font-size: 13px; }}
-  .summary {{ display: flex; gap: 12px; padding: 16px 32px; flex-wrap: wrap; }}
-  .stat {{ padding: 10px 16px; border-radius: 8px; background: #1e293b; font-size: 13px; }}
-  .stat b {{ font-size: 18px; display: block; }}
-  .stat.confirmed {{ border-left: 4px solid #16a34a; }}
-  .stat.misaligned {{ border-left: 4px solid #dc2626; }}
-  .stat.gap {{ border-left: 4px solid #d97706; }}
-  .stat.risk {{ border-left: 4px solid #a855f7; }}
-  .stat.strength {{ border-left: 4px solid #0ea5e9; }}
-  .indicator-bar {{ margin: 0 32px 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-                     gap: 12px; }}
-  .indicator {{ padding: 14px 16px; border-radius: 12px; background: #111827; border: 1px solid #1e293b; }}
-  .indicator-value {{ font-size: 24px; font-weight: 700; color: #e2e8f0; }}
-  .indicator-label {{ font-size: 12px; color: #cbd5e1; margin-top: 2px; }}
-  .indicator-detail {{ font-size: 11px; margin-top: 4px; }}
-  .score-card {{ margin: 0 32px 16px; padding: 16px 20px; border-radius: 12px; background: #111827;
-                 border: 1px solid #1e293b; display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }}
-  .score-number {{ font-size: 36px; font-weight: 700; color: #e2e8f0; }}
-  .score-max {{ font-size: 16px; color: #64748b; font-weight: 400; }}
-  .score-label {{ font-size: 14px; color: #cbd5e1; }}
-  .score-math {{ font-size: 12px; }}
-  .score-philosophy {{ flex-basis: 100%; margin-top: 8px; }}
-  .score-philosophy summary {{ cursor: pointer; font-size: 12px; color: #7dd3fc; }}
-  .score-philosophy p {{ font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 8px 0 0; }}
-  main {{ display: flex; gap: 24px; padding: 0 32px 32px; flex-wrap: wrap; align-items: flex-start; }}
-  .left-panel {{ flex: 1 1 380px; min-width: 300px; display: flex; flex-direction: column; gap: 20px; }}
-  .panel-card {{ background: #111827; border-radius: 12px; padding: 16px; border: 1px solid #1e293b; }}
-  .panel-title {{ font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 10px;
-                   text-transform: uppercase; letter-spacing: .03em; }}
-  .insight-block + .insight-block {{ margin-top: 16px; padding-top: 16px; border-top: 1px solid #1e293b; }}
-  .insight-title {{ font-size: 12.5px; font-weight: 600; color: #cbd5e1; }}
-  .insight-stats {{ font-size: 12px; color: #94a3b8; margin: 4px 0 10px; }}
-  .insight-sub {{ font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .03em; margin: 10px 0 4px; }}
-  .insight-list {{ list-style: none; margin: 0; padding: 0; font-size: 12.5px; }}
-  .insight-list li {{ display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }}
-  .insight-list code {{ color: #7dd3fc; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; }}
-  .insight-list .muted {{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }}
-  .insight-list b {{ color: #e2e8f0; }}
-  .key-findings-list {{ list-style: none; margin: 0; padding: 0; }}
-  .key-finding {{ border-bottom: 1px solid #1e293b; }}
-  .key-finding:last-child {{ border-bottom: none; }}
-  .key-finding-link {{ display: flex; gap: 8px; align-items: baseline; padding: 8px 0; text-decoration: none; color: inherit; }}
-  .key-finding-claim {{ font-size: 12.5px; color: #e2e8f0; }}
-  .table-panel {{ flex: 2 1 640px; min-width: 320px; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-  th, td {{ text-align: left; padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: top; }}
-  th {{ color: #94a3b8; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }}
-  .badge {{ padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }}
-  .badge-confirmed {{ background: #16a34a33; color: #4ade80; }}
-  .badge-misaligned {{ background: #dc262633; color: #f87171; }}
-  .badge-gap {{ background: #d9770633; color: #fbbf24; }}
-  .badge-risk {{ background: #a855f733; color: #d8b4fe; }}
-  .badge-strength {{ background: #0ea5e933; color: #7dd3fc; }}
-  .badge-sev-high {{ background: #7f1d1d; color: #fecaca; }}
-  .badge-sev-medium {{ background: #78350f; color: #fde68a; }}
-  .badge-sev-low {{ background: #1e293b; color: #94a3b8; }}
-  .dim-tag {{ color: #64748b; font-size: 10.5px; margin-top: 4px; }}
-  .meta-tags {{ margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }}
-  .meta-tag {{ background: #1e293b; color: #94a3b8; border-radius: 4px; padding: 1px 6px;
+          background: #F8F9EB; color: #1a1a1a; }}
+  .wrap {{ max-width: 920px; margin: 0 auto; padding: 48px 32px 80px; }}
+
+  .eyebrow {{ font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8a8a7a; }}
+  header {{ margin-bottom: 6px; }}
+  h1 {{ margin: 6px 0 10px; font-size: 40px; letter-spacing: -0.02em; }}
+  .subtitle {{ color: #6b6b60; font-size: 13px; line-height: 1.5; max-width: 640px; }}
+
+  .meta-row {{ display: flex; gap: 28px; flex-wrap: wrap; margin: 22px 0 32px; padding: 16px 0;
+               border-top: 1px solid #dcdccb; border-bottom: 1px solid #dcdccb; }}
+  .meta-item .meta-value {{ font-size: 15px; font-weight: 700; }}
+  .meta-item .meta-label {{ font-size: 10.5px; color: #8a8a7a; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }}
+
+  .score-card {{ background: #1c1c1a; color: #f2f2ea; border-radius: 24px; padding: 32px; display: flex;
+                 gap: 32px; flex-wrap: wrap; margin-bottom: 32px; }}
+  .score-left {{ flex: 0 0 200px; }}
+  .score-left .eyebrow {{ color: #8a8a80; }}
+  .score-number {{ font-size: 96px; font-weight: 800; line-height: 1; color: #4EAAFF; margin-top: 6px; }}
+  .score-caption {{ font-size: 12px; color: #a9a99c; margin-top: 10px; }}
+  .score-right {{ flex: 1 1 320px; font-size: 13.5px; line-height: 1.6; color: #d4d4c8; }}
+  .score-right b {{ color: #f2f2ea; }}
+  .score-philosophy {{ margin-top: 14px; }}
+  .score-philosophy summary {{ cursor: pointer; font-size: 12px; color: #4EAAFF; }}
+  .score-philosophy[open] summary {{ margin-bottom: 8px; }}
+  .score-philosophy p {{ font-size: 12px; color: #a9a99c; line-height: 1.6; margin: 6px 0 0; }}
+
+  .indicators {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 20px;
+                 margin-bottom: 40px; }}
+  .indicator-value {{ font-size: 22px; font-weight: 700; }}
+  .indicator-label {{ font-size: 11.5px; color: #6b6b60; margin-top: 3px; }}
+  .indicator-detail {{ font-size: 10.5px; color: #9a9a8c; margin-top: 3px; }}
+
+  section.found > h2 {{ font-size: 22px; margin: 0 0 2px; }}
+  section.found > .subtitle {{ margin-bottom: 18px; }}
+
+  .stat-cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px;
+                 margin-bottom: 16px; }}
+  .stat-card {{ background: #1c1c1a; border-radius: 16px; padding: 18px 20px; border-top: 4px solid var(--accent);
+                cursor: pointer; transition: transform .1s ease; }}
+  .stat-card:hover {{ transform: translateY(-2px); }}
+  .stat-card.selected {{ outline: 2px solid #4EAAFF; }}
+  .stat-card.risk {{ --accent: #e05a4a; }}
+  .stat-card.strength {{ --accent: #4EAAFF; }}
+  .stat-card.confirmed {{ --accent: #3fb95f; }}
+  .stat-card.gap {{ --accent: #e0a83f; }}
+  .stat-card.misaligned {{ --accent: #b06fe0; }}
+  .stat-card .num {{ font-size: 34px; font-weight: 800; color: #f2f2ea; }}
+  .stat-card .label {{ font-size: 11.5px; color: #b8b8a8; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }}
+
+  .sev-card {{ background: #1c1c1a; border-radius: 16px; padding: 22px 24px; display: flex; gap: 24px;
+               flex-wrap: wrap; margin-bottom: 32px; }}
+  .sev-col {{ flex: 1 1 160px; cursor: pointer; border-radius: 12px; padding: 6px 8px; margin: -6px -8px; }}
+  .sev-col:hover {{ background: #262622; }}
+  .sev-col.selected {{ outline: 2px solid #4EAAFF; }}
+  .sev-col .num {{ font-size: 26px; font-weight: 800; }}
+  .sev-col.high .num {{ color: #ff6b57; }}
+  .sev-col.medium .num {{ color: #f0b64a; }}
+  .sev-col.low .num {{ color: #7fb8ff; }}
+  .sev-col.info .num {{ color: #b8b8a8; }}
+  .sev-col .label {{ font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #b8b8a8; margin: 2px 0 8px; }}
+  .sev-col .desc {{ font-size: 11.5px; color: #8a8a80; line-height: 1.5; }}
+
+  .filters {{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }}
+  .filters .group-label {{ color: #8a8a7a; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }}
+  .filters button {{ background: #ece9d8; color: #1a1a1a; border: 1px solid #dcdccb; border-radius: 999px;
+                      padding: 6px 14px; font-size: 12px; cursor: pointer; }}
+  .filters button.active {{ background: #1c1c1a; color: #f2f2ea; border-color: #1c1c1a; }}
+  .filters {{ margin-bottom: 12px; }}
+  #dim-filters {{ margin-bottom: 28px; }}
+
+  .sev-group-title {{ font-size: 18px; font-weight: 700; margin: 32px 0 4px; }}
+  .sev-group-sub {{ font-size: 12.5px; color: #8a8a7a; margin-bottom: 14px; }}
+
+  .finding {{ display: flex; gap: 16px; padding: 20px 0; border-top: 1px solid #dcdccb; }}
+  .finding.hidden {{ display: none; }}
+  .finding-num {{ flex: 0 0 30px; height: 30px; border-radius: 50%; background: #1c1c1a; color: #f2f2ea;
+                  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }}
+  .finding-body {{ flex: 1; min-width: 0; }}
+  .finding-tags {{ display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }}
+  .badge {{ padding: 2px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .03em; white-space: nowrap; }}
+  .badge-confirmed {{ background: #dcf3e1; color: #1e7a3c; }}
+  .badge-misaligned {{ background: #fbe2e0; color: #b3392c; }}
+  .badge-gap {{ background: #fbebd2; color: #a06a10; }}
+  .badge-risk {{ background: #fbe2e0; color: #b3392c; }}
+  .badge-strength {{ background: #dbeafe; color: #1d5fb3; }}
+  .badge-sev-high {{ background: #fbe2e0; color: #b3392c; }}
+  .badge-sev-medium {{ background: #fbebd2; color: #a06a10; }}
+  .badge-sev-low {{ background: #eaf2fc; color: #1d5fb3; }}
+  .badge-sev-info {{ background: #ece9d8; color: #6b6b60; }}
+  .dim-tag {{ font-size: 10.5px; color: #8a8a7a; text-transform: uppercase; letter-spacing: .03em; }}
+  .finding-claim {{ font-size: 15px; font-weight: 600; margin-bottom: 4px; }}
+  .explanation {{ color: #4a4a42; font-size: 13px; line-height: 1.55; margin-top: 4px; }}
+  .recommendation {{ color: #1d5fb3; font-size: 12.5px; margin-top: 8px; background: #eaf2fc; border-radius: 8px;
+                      padding: 8px 12px; }}
+  .evidence {{ font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; color: #d4d4c8;
+               background: #1c1c1a; border-radius: 10px; padding: 10px 14px; margin-top: 10px; overflow-x: auto;
+               line-height: 1.6; }}
+  .source-line {{ font-size: 11px; color: #8a8a7a; margin-top: 8px; }}
+  .source-line .muted {{ color: #a9a99c; }}
+  .meta-tags {{ margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }}
+  .meta-tag {{ background: #ece9d8; color: #6b6b60; border-radius: 4px; padding: 1px 8px;
                font-size: 10px; white-space: nowrap; }}
-  .meta-tag-impact {{ color: #a5b4fc; }}
-  .meta-tag-confidence {{ color: #86efac; }}
-  .explanation {{ color: #94a3b8; font-size: 12px; margin-top: 4px; }}
-  .recommendation {{ color: #d8b4fe; font-size: 12px; margin-top: 6px; }}
-  .muted {{ color: #64748b; font-size: 11px; }}
-  .evidence {{ font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; }}
-  .filters {{ padding: 4px 32px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }}
-  .filters .group-label {{ color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }}
-  .filters button {{ background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px;
-                      padding: 6px 12px; font-size: 12px; cursor: pointer; }}
-  .filters button.active {{ background: #334155; border-color: #64748b; }}
-  tr.hidden {{ display: none; }}
-  tr.flash {{ outline: 2px solid #38bdf8; }}
+  .meta-tag-impact {{ color: #4a3fa0; }}
+  .meta-tag-confidence {{ color: #1e7a3c; }}
+
+  .side-panels {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;
+                  margin-top: 48px; }}
+  .panel-card {{ background: #1c1c1a; color: #d4d4c8; border-radius: 16px; padding: 18px 20px; }}
+  .panel-title {{ font-size: 11.5px; font-weight: 700; color: #f2f2ea; margin-bottom: 10px;
+                   text-transform: uppercase; letter-spacing: .04em; }}
+  .insight-block + .insight-block {{ margin-top: 14px; padding-top: 14px; border-top: 1px solid #33332e; }}
+  .insight-title {{ font-size: 12px; font-weight: 600; color: #d4d4c8; }}
+  .insight-stats {{ font-size: 11.5px; color: #a9a99c; margin: 4px 0 8px; }}
+  .insight-sub {{ font-size: 10.5px; color: #8a8a80; text-transform: uppercase; letter-spacing: .03em; margin: 8px 0 4px; }}
+  .insight-list {{ list-style: none; margin: 0; padding: 0; font-size: 12px; }}
+  .insight-list li {{ display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }}
+  .insight-list code {{ color: #7fb8ff; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }}
+  .insight-list .muted {{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: #8a8a80; }}
+  .insight-list b {{ color: #f2f2ea; }}
+  .empty-note {{ color: #8a8a7a; font-size: 12.5px; }}
+  .muted {{ color: #8a8a7a; font-size: 12.5px; }}
+
+  .key-findings-list {{ list-style: none; margin: 0; padding: 0; }}
+  .key-finding {{ border-bottom: 1px solid #33332e; }}
+  .key-finding:last-child {{ border-bottom: none; }}
+  .key-finding-link {{ display: flex; gap: 8px; align-items: baseline; padding: 8px 0; text-decoration: none; color: inherit; flex-wrap: wrap; }}
+  .key-finding-claim {{ font-size: 12.5px; color: #f2f2ea; }}
+
+  tr.flash, .finding.flash {{ outline: 2px solid #4EAAFF; }}
 </style>
 </head>
 <body>
+<div class="wrap">
+
 <header>
+  <div class="eyebrow">Architecture debt report</div>
   <h1>{title}</h1>
   <div class="subtitle">Doc sources: {doc_sources}</div>
 </header>
-{indicators}
-<div class="summary">
-  <div class="stat confirmed"><b>{n_confirmed}</b>Confirmed</div>
-  <div class="stat misaligned"><b>{n_misaligned}</b>Misaligned</div>
-  <div class="stat gap"><b>{n_gap}</b>Gaps</div>
-  <div class="stat risk"><b>{n_risk}</b>Architecture Risks</div>
-  <div class="stat strength"><b>{n_strength}</b>Strengths</div>
+
+<div class="meta-row">
+  {meta_row}
 </div>
+
+{score_card}
+
+<div class="indicators">
+  {indicators}
+</div>
+
+<section class="found">
+  <h2>What the review found</h2>
+  <div class="subtitle">{n_findings} findings across {n_dims} dimensions</div>
+
+  <div class="stat-cards">
+    {stat_cards}
+  </div>
+
+  <div class="sev-card">
+    {sev_card}
+  </div>
+</section>
+
 <div class="filters" id="cls-filters">
   <span class="group-label">Type</span>
   <button class="active" data-filter-group="cls" data-filter="all">All</button>
@@ -614,52 +791,51 @@ TEMPLATE = """<!doctype html>
 <div class="filters" id="dim-filters">
   <span class="group-label">Dimension</span>
   <button class="active" data-filter-group="dim" data-filter="all">All</button>
-  <button data-filter-group="dim" data-filter="correctness">Correctness</button>
-  <button data-filter-group="dim" data-filter="scale-requirements">Scale Requirements</button>
-  <button data-filter-group="dim" data-filter="extensibility-requirements">Extensibility Requirements</button>
-  <button data-filter-group="dim" data-filter="scalability">Scalability</button>
-  <button data-filter-group="dim" data-filter="extensibility">Extensibility</button>
-  <button data-filter-group="dim" data-filter="maintainability">Maintainability</button>
-  <button data-filter-group="dim" data-filter="performance-cost">Performance / Cost</button>
-  <button data-filter-group="dim" data-filter="data-architecture">Data Architecture</button>
-  <button data-filter-group="dim" data-filter="observability">Observability</button>
-  <button data-filter-group="dim" data-filter="reliability-resilience">Reliability / Resilience</button>
-  <button data-filter-group="dim" data-filter="change-safety">Change Safety</button>
-  <button data-filter-group="dim" data-filter="security-boundaries">Security Boundaries</button>
-  <button data-filter-group="dim" data-filter="vision-alignment">Vision Alignment</button>
+  {dim_filter_buttons}
 </div>
-<main>
-  <div class="left-panel">
-    <div class="panel-card">
-      <div class="panel-title">Key pressing findings</div>
-      {key_findings}
-    </div>
-    <div class="panel-card">
-      <div class="panel-title">Static code analysis</div>
-      {static_analysis}
-    </div>
-    {check_coverage_panel}
+
+<div id="findings-body">
+{findings_groups}
+</div>
+
+<div class="side-panels">
+  <div class="panel-card">
+    <div class="panel-title">Key pressing findings</div>
+    {key_findings}
   </div>
-  <div class="table-panel">
-    <table>
-      <thead><tr><th>Finding</th><th>Claim / Explanation</th><th>Doc source</th><th>Code evidence</th></tr></thead>
-      <tbody id="findings-body">
-        {findings_rows}
-      </tbody>
-    </table>
+  <div class="panel-card">
+    <div class="panel-title">Static code analysis</div>
+    {static_analysis}
   </div>
-</main>
+  {check_coverage_panel}
+</div>
+
+</div>
 <script>
-  const state = {{ cls: 'all', dim: 'all' }};
-  const rows = document.querySelectorAll('.finding-row');
+  const state = {{ cls: 'all', dim: 'all', sev: 'all' }};
+  const rows = document.querySelectorAll('.finding');
+
+  function matchCls(r) {{
+    if (state.cls === 'all') return true;
+    if (state.cls === 'strength') return r.dataset.cls === 'strength' || r.dataset.strength === 'true';
+    return r.dataset.cls === state.cls;
+  }}
 
   function applyFilters() {{
     rows.forEach(r => {{
-      const clsOk = state.cls === 'all' || r.dataset.cls === state.cls
-        || (state.cls === 'strength' && r.dataset.strength === 'true');
+      const clsOk = matchCls(r);
       const dimOk = state.dim === 'all' || r.dataset.dim === state.dim;
-      r.classList.toggle('hidden', !(clsOk && dimOk));
+      const sevOk = state.sev === 'all' || r.dataset.sev === state.sev;
+      r.classList.toggle('hidden', !(clsOk && dimOk && sevOk));
     }});
+  }}
+
+  function scrollToFirstMatch() {{
+    const first = Array.from(rows).find(r => !r.classList.contains('hidden'));
+    if (!first) return;
+    first.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+    first.classList.add('flash');
+    setTimeout(() => first.classList.remove('flash'), 2000);
   }}
 
   document.querySelectorAll('.filters button').forEach(btn => btn.addEventListener('click', () => {{
@@ -670,13 +846,46 @@ TEMPLATE = """<!doctype html>
     applyFilters();
   }}));
 
+  document.querySelectorAll('.stat-card').forEach(card => card.addEventListener('click', () => {{
+    const filter = card.dataset.filterCls;
+    document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.sev-col').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    state.sev = 'all';
+    state.cls = filter;
+    document.querySelectorAll('.filters button[data-filter-group="cls"]').forEach(b =>
+      b.classList.toggle('active', b.dataset.filter === filter));
+    document.querySelectorAll('.filters button[data-filter-group="dim"]')[0].click();
+    applyFilters();
+    scrollToFirstMatch();
+  }}));
+
+  document.querySelectorAll('.sev-col').forEach(col => col.addEventListener('click', () => {{
+    const filter = col.dataset.filterSev;
+    document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.sev-col').forEach(c => c.classList.remove('selected'));
+    col.classList.add('selected');
+    state.cls = 'all';
+    state.sev = filter;
+    document.querySelectorAll('.filters button[data-filter-group="cls"]')[0].click();
+    document.querySelectorAll('.filters button[data-filter-group="dim"]')[0].click();
+    state.sev = filter;
+    applyFilters();
+    scrollToFirstMatch();
+  }}));
+
   document.querySelectorAll('.key-finding-link').forEach(link => link.addEventListener('click', (ev) => {{
     const targetId = link.getAttribute('href').slice(1);
     const row = document.getElementById(targetId);
     if (!row) return;
     ev.preventDefault();
+    document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.sev-col').forEach(c => c.classList.remove('selected'));
     document.querySelectorAll('.filters button[data-filter-group="cls"]')[0].click();
     document.querySelectorAll('.filters button[data-filter-group="dim"]')[0].click();
+    state.sev = 'all';
+    applyFilters();
+    row.classList.remove('hidden');
     row.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
     row.classList.add('flash');
     setTimeout(() => row.classList.remove('flash'), 2000);
@@ -715,25 +924,28 @@ def main():
             counts[cls] += 1
     counts["strength"] = sum(1 for f in findings if is_strength(f))
 
-    static_analysis_parts = [build_static_analysis(dep_graph, churn)]
+    n_dims = len({s(f, "dimension", "correctness") for f in findings}) if findings else 0
+
     check_coverage_panel = build_check_coverage(checks_doc, context_doc, manifest)
 
     html_out = TEMPLATE.format(
         title=html.escape(title),
         doc_sources=html.escape(doc_sources),
-        indicators=build_indicators(findings, checks_doc, context_doc, manifest),
-        n_confirmed=counts["confirmed"],
-        n_misaligned=counts["misaligned"],
-        n_gap=counts["gap"],
-        n_risk=counts["risk"],
-        n_strength=counts["strength"],
+        meta_row=build_meta_row(findings, dep_graph, checks_doc, context_doc, manifest),
+        score_card=build_score_card(findings),
+        indicators=build_indicators_grid(findings, checks_doc, context_doc, manifest),
+        n_findings=len(findings),
+        n_dims=n_dims,
+        stat_cards=build_stat_cards(counts),
+        sev_card=build_sev_card(findings),
+        dim_filter_buttons=DIM_FILTER_BUTTONS,
+        findings_groups=build_findings_groups(findings),
         key_findings=build_key_findings(findings),
-        static_analysis="".join(static_analysis_parts),
+        static_analysis=build_static_analysis(dep_graph, churn),
         check_coverage_panel=(
             f'<div class="panel-card"><div class="panel-title">Check coverage</div>{check_coverage_panel}</div>'
             if check_coverage_panel else ""
         ),
-        findings_rows=build_findings_table(findings),
     )
 
     with open(args.out, "w") as fh:
