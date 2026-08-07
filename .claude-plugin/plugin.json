@@ -1,7 +1,7 @@
 {
   "name": "architecture-debt-visualizer",
   "description": "Reconciles a repo's design docs against its actual code and evaluates the architecture itself like a senior/staff architect — scalability, extensibility, maintainability, performance/cost, data-architecture, observability, and vision alignment, classified against what kind of system this actually is. Also runs technical design reviews of new feature proposals against the systems they touch. Produces a scored, filterable HTML report.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": {
     "name": "Sumeet Sharma"
   },
