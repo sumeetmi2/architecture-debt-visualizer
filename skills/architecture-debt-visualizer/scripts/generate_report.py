@@ -711,9 +711,10 @@ def main():
     counts = {"confirmed": 0, "misaligned": 0, "gap": 0, "risk": 0, "strength": 0}
     for f in findings:
         cls = s(f, "classification")
-        if cls in counts:
+        if is_strength(f):
+            counts["strength"] += 1
+        elif cls in counts:
             counts[cls] += 1
-    counts["strength"] = sum(1 for f in findings if is_strength(f))
 
     static_analysis_parts = [build_static_analysis(dep_graph, churn)]
     check_coverage_panel = build_check_coverage(checks_doc, context_doc, manifest)
