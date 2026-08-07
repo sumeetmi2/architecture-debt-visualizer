@@ -165,6 +165,16 @@ def s(d, key, default=""):
     return val if val is not None else default
 
 
+def is_strength(f):
+    """A finding counts as a strength if it's explicitly classified that way (standalone,
+    no doc claim), OR tagged finding_type="architecture-strength" even when classification
+    is "confirmed" (it reconciles against a real doc claim *and* is worth crediting as sound
+    design — e.g. a decision log's bet that's still paying off). Without the finding_type
+    check, confirmed-but-noteworthy findings are invisible to the Strengths stat/filter/bonus
+    even though the table visibly tags them "architecture-strength", which reads as a bug."""
+    return f.get("classification") == "strength" or f.get("finding_type") == "architecture-strength"
+
+
 def _capped_penalty(findings_subset):
     penalty_by_dim = {}
     for f in findings_subset:
@@ -176,7 +186,7 @@ def _capped_penalty(findings_subset):
 def compute_score(findings):
     """Legacy 0-100 debt index — unchanged formula, kept as the secondary indicator."""
     penalty = _capped_penalty([f for f in findings if f.get("classification") in ("risk", "misaligned", "gap")])
-    bonus = min(STRENGTH_BONUS_CAP, STRENGTH_BONUS_PER * sum(1 for f in findings if f.get("classification") == "strength"))
+    bonus = min(STRENGTH_BONUS_CAP, STRENGTH_BONUS_PER * sum(1 for f in findings if is_strength(f)))
     score = max(0, min(100, 100 - penalty + bonus))
     label = next(lbl for threshold, lbl in SCORE_BANDS if score >= threshold)
     return score, label, penalty, bonus
@@ -195,7 +205,7 @@ def compute_architecture_risk(findings):
     if not eval_findings:
         return None
     penalty = _capped_penalty([f for f in eval_findings if f.get("classification") == "risk"])
-    bonus = min(STRENGTH_BONUS_CAP, STRENGTH_BONUS_PER * sum(1 for f in eval_findings if f.get("classification") == "strength"))
+    bonus = min(STRENGTH_BONUS_CAP, STRENGTH_BONUS_PER * sum(1 for f in eval_findings if is_strength(f)))
     score = max(0, min(100, 100 - penalty + bonus))
     label = next(lbl for threshold, lbl in RISK_BANDS if score >= threshold)
     return label, score
@@ -476,8 +486,9 @@ def build_findings_table(findings):
             meta_bits.append(f'<span class="meta-tag meta-tag-confidence">confidence: {html.escape(confidence)}</span>')
         meta_html = f'<div class="meta-tags">{"".join(meta_bits)}</div>' if meta_bits else ""
 
+        strength_attr = ' data-strength="true"' if is_strength(f) else ""
         rows.append(
-            f'<tr class="finding-row" id="row-{html.escape(f["id"])}" data-cls="{cls}" data-dim="{dim}" data-sev="{severity}">'
+            f'<tr class="finding-row" id="row-{html.escape(f["id"])}" data-cls="{cls}" data-dim="{dim}" data-sev="{severity}"{strength_attr}>'
             f'<td><span class="badge badge-{cls}">{CLASS_LABEL.get(cls, cls)}</span>'
             f'<div class="dim-tag">{DIMENSION_LABEL.get(dim, dim)} · {SEVERITY_LABEL.get(severity, severity)}</div>'
             f'{meta_html}</td>'
@@ -644,7 +655,8 @@ TEMPLATE = """<!doctype html>
 
   function applyFilters() {{
     rows.forEach(r => {{
-      const clsOk = state.cls === 'all' || r.dataset.cls === state.cls;
+      const clsOk = state.cls === 'all' || r.dataset.cls === state.cls
+        || (state.cls === 'strength' && r.dataset.strength === 'true');
       const dimOk = state.dim === 'all' || r.dataset.dim === state.dim;
       r.classList.toggle('hidden', !(clsOk && dimOk));
     }});
@@ -701,6 +713,7 @@ def main():
         cls = s(f, "classification")
         if cls in counts:
             counts[cls] += 1
+    counts["strength"] = sum(1 for f in findings if is_strength(f))
 
     static_analysis_parts = [build_static_analysis(dep_graph, churn)]
     check_coverage_panel = build_check_coverage(checks_doc, context_doc, manifest)
